@@ -1,0 +1,1448 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<title>KONEKT Browser</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap">
+<style>
+/* ================================================================
+   KONEKT BROWSER — chrome
+   Same design system as KONEKT: black, cubic, Montserrat.
+   ================================================================ */
+:root{
+  --bg:#000000;
+  --hover:#0d0d0d;
+  --hover-2:#141414;
+  --line:#434343;      /* soft rule            */
+  --line-2:#666666;    /* hard rule / inputs   */
+  --line-3:#232323;    /* hairline             */
+  --text:#ffffff;
+  --text-2:#d8d8d8;
+  --btn-h:#d6d6d6;
+  --dim:#999999;
+  --dim-2:#6f6f6f;
+  --accent:#1d9bf0;
+  --warn:#ffd400;
+  --danger:#f4212e;
+  --ok:#00ba7c;
+  --font:'Montserrat','Segoe UI',Arial,Helvetica,sans-serif;
+  --cap:38px;          /* titlebar / tab strip  */
+  --bar:46px;          /* toolbar               */
+  color-scheme:dark;
+}
+:root[data-theme="light"]{
+  --bg:#ffffff;
+  --hover:#f3f3f3;
+  --hover-2:#e8e8e8;
+  --line:#c4c4c4;
+  --line-2:#8f8f8f;
+  --line-3:#e2e2e2;
+  --text:#000000;
+  --text-2:#2b2b2b;
+  --btn-h:#2f2f2f;
+  --dim:#666666;
+  --dim-2:#8a8a8a;
+  color-scheme:light;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%;overflow:hidden}
+body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14px;
+  display:flex;flex-direction:column;user-select:none}
+button{font-family:var(--font);background:none;border:0;color:var(--text);cursor:pointer}
+input{font-family:var(--font)}
+svg{display:block}
+::-webkit-scrollbar{width:8px;height:8px}
+::-webkit-scrollbar-thumb{background:var(--line);border:2px solid var(--bg)}
+::-webkit-scrollbar-track{background:transparent}
+
+/* ---------------- titlebar + tabs ---------------- */
+#cap{height:var(--cap);flex:0 0 auto;display:flex;align-items:stretch;
+  width:env(titlebar-area-width,100%);-webkit-app-region:drag;background:var(--bg)}
+#capLogo{display:flex;align-items:center;padding:0 10px 0 12px;-webkit-app-region:drag}
+.lg{display:inline-flex;align-items:center;color:var(--text);font-weight:800;line-height:1;user-select:none}
+.lg-t{letter-spacing:-.005em;display:block;transform:translateY(-.005em)}
+.lg .gl{display:block;flex:0 0 auto;margin:0 -.045em}
+#tabs{display:flex;align-items:stretch;flex:0 1 auto;min-width:0;overflow-x:auto;
+  -webkit-app-region:no-drag;scrollbar-width:none}
+#tabs::-webkit-scrollbar{display:none}
+.tab{position:relative;display:flex;align-items:center;gap:7px;flex:0 1 210px;min-width:56px;
+  padding:0 8px 0 11px;border-right:1px solid var(--line-3);color:var(--dim);
+  font-size:11.5px;font-weight:600;cursor:default;-webkit-app-region:no-drag;overflow:hidden}
+.tab:first-child{border-left:1px solid var(--line-3)}
+.tab:hover{background:var(--hover);color:var(--text-2)}
+.tab.on{background:var(--hover-2);color:var(--text)}
+.tab.on::after{content:'';position:absolute;left:0;right:0;bottom:0;height:2px;background:var(--text)}
+.tab.drop-l::before,.tab.drop-r::before{content:'';position:absolute;top:6px;bottom:6px;width:2px;background:var(--accent)}
+.tab.drop-l::before{left:-1px}
+.tab.drop-r::before{right:-1px}
+.tfav{flex:0 0 auto;width:15px;height:15px;display:flex;align-items:center;justify-content:center}
+.tfav img{width:15px;height:15px;object-fit:contain}
+.tfav .glyph{font-size:10px;font-weight:800;color:var(--dim)}
+.tab.on .tfav .glyph{color:var(--text)}
+.tload{flex:0 0 auto;width:11px;height:11px;border:1.5px solid var(--line-2);border-top-color:var(--text);
+  border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.ttitle{flex:1 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tsnd{flex:0 0 auto;width:16px;height:16px;display:none;align-items:center;justify-content:center;color:var(--dim)}
+.tsnd:hover{color:var(--text)}
+.tab.audible .tsnd,.tab.muted .tsnd{display:flex}
+.tx{flex:0 0 auto;width:17px;height:17px;display:flex;align-items:center;justify-content:center;
+  color:var(--dim-2);visibility:hidden}
+.tab:hover .tx,.tab.on .tx{visibility:visible}
+.tx:hover{background:var(--line-3);color:var(--text)}
+#ntb{flex:0 0 auto;width:34px;display:flex;align-items:center;justify-content:center;color:var(--dim);
+  -webkit-app-region:no-drag}
+#ntb:hover{background:var(--hover);color:var(--text)}
+#capPad{flex:1 1 0;-webkit-app-region:drag}
+
+/* ---------------- toolbar ---------------- */
+#bar{height:var(--bar);flex:0 0 auto;display:flex;align-items:center;gap:2px;
+  padding:0 8px;border-bottom:1px solid var(--line-3);background:var(--bg)}
+.nbtn{width:34px;height:34px;display:flex;align-items:center;justify-content:center;color:var(--text-2)}
+.nbtn:hover{background:var(--hover-2)}
+.nbtn:disabled{color:var(--line);cursor:default}
+.nbtn:disabled:hover{background:none}
+.nbtn.rel{position:relative}
+.badge{position:absolute;top:3px;right:3px;min-width:13px;height:13px;padding:0 3px;background:var(--accent);
+  color:#fff;font-size:8.5px;font-weight:700;display:flex;align-items:center;justify-content:center}
+#omni{flex:1 1 auto;min-width:0;position:relative;height:33px;margin:0 6px;
+  border:1px solid var(--line);display:flex;align-items:center;background:var(--bg)}
+#omni:focus-within{border-color:var(--text)}
+#secIc{flex:0 0 auto;width:30px;display:flex;align-items:center;justify-content:center;color:var(--dim)}
+#secIc.safe{color:var(--text-2)}
+#secIc.unsafe{color:var(--warn)}
+#addr{flex:1 1 auto;min-width:0;background:none;border:0;outline:0;color:var(--text);
+  font-size:13px;font-weight:500;height:100%;user-select:text}
+#addr::placeholder{color:var(--dim-2)}
+#star{width:30px;height:31px;display:flex;align-items:center;justify-content:center;color:var(--dim)}
+#star:hover{color:var(--text)}
+#star.on{color:var(--text)}
+/* omnibox suggestions */
+#sug{position:absolute;top:calc(100% + 1px);left:-1px;right:-1px;background:var(--bg);
+  border:1px solid var(--line);border-top:0;z-index:60;display:none}
+#sug.open{display:block}
+.sug{display:flex;align-items:center;gap:10px;padding:8px 12px;font-size:12.5px;cursor:default;min-width:0}
+.sug .si{flex:0 0 auto;color:var(--dim)}
+.sug .st{flex:0 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600}
+.sug .su{flex:1 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--dim);font-size:11.5px}
+.sug.hot{background:var(--hover-2)}
+/* progress hairline */
+#prog{height:2px;flex:0 0 auto;background:var(--bg);position:relative;overflow:hidden}
+#prog i{position:absolute;left:0;top:0;bottom:0;width:0;background:var(--accent);
+  transition:width .25s linear,opacity .3s linear;opacity:0}
+#prog.run i{opacity:1}
+
+/* ---------------- permission bar ---------------- */
+#permbar{display:none;flex:0 0 auto;align-items:center;gap:12px;padding:9px 14px;
+  border-bottom:1px solid var(--line-3);border-left:2px solid var(--accent);font-size:12.5px}
+#permbar.open{display:flex}
+#permbar b{font-weight:700}
+#permbar .sp{flex:1 1 auto}
+.pchk{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--dim);cursor:pointer}
+.pchk input{accent-color:var(--text)}
+.pbtn{padding:6px 16px;border:1px solid var(--line-2);font-size:11px;font-weight:700;
+  text-transform:uppercase;letter-spacing:.08em}
+.pbtn:hover{background:var(--hover-2)}
+.pbtn.solid{background:var(--text);color:var(--bg);border-color:var(--text)}
+.pbtn.solid:hover{background:var(--btn-h)}
+
+/* ---------------- sidebar + KONEKT panel (Opera-style) ---------------- */
+#main{flex:1 1 auto;display:flex;min-height:0}
+#side{flex:0 0 46px;display:flex;flex-direction:column;align-items:center;gap:2px;
+  padding:8px 0;border-right:1px solid var(--line-3)}
+.sbtn{width:36px;height:36px;display:flex;align-items:center;justify-content:center;
+  color:var(--dim);position:relative}
+.sbtn:hover{background:var(--hover-2);color:var(--text)}
+.sbtn.on{color:var(--text)}
+.sbtn.on::before{content:'';position:absolute;left:-5px;top:8px;bottom:8px;width:2px;background:var(--text)}
+.s-sp{flex:1 1 auto}
+.sbadge{position:absolute;top:1px;right:1px;min-width:14px;height:13px;padding:0 3px;
+  background:var(--accent);color:#fff;font-size:8px;font-weight:700;
+  display:flex;align-items:center;justify-content:center}
+#kpanel{flex:0 0 380px;display:none;flex-direction:column;border-right:1px solid var(--line);min-width:0}
+#kpanel.open{display:flex}
+.kp-head{flex:0 0 auto;display:flex;align-items:center;gap:8px;padding:7px 10px;
+  border-bottom:1px solid var(--line-3)}
+.kp-head .sp{flex:1 1 auto}
+.kp-t{font-size:9.5px;text-transform:uppercase;letter-spacing:.16em;color:var(--dim);font-weight:500}
+#kpBody{flex:1 1 auto;display:flex;min-height:0}
+#kpBody webview{flex:1 1 auto}
+body.fs #cap,body.fs #bar,body.fs #side,body.fs #prog{display:none}
+/* speed-dial custom tiles */
+.st-tile{position:relative}
+.st-tile .tdel{position:absolute;top:2px;right:2px;width:16px;height:16px;display:none;
+  align-items:center;justify-content:center;color:var(--dim-2)}
+.st-tile:hover .tdel{display:flex}
+.st-tile .tdel:hover{color:var(--danger)}
+#dialForm{width:100%;border:1px solid var(--line);padding:12px;display:none;
+  flex-direction:column;gap:8px;margin:-24px 0 34px}
+#dialForm.open{display:flex}
+#dialForm input{background:none;border:1px solid var(--line-2);color:var(--text);
+  font-size:12.5px;padding:7px 10px;outline:0;user-select:text}
+#dialForm input:focus{border-color:var(--text)}
+#dialForm .dfr{display:flex;gap:8px;justify-content:flex-end}
+#dialForm button{padding:7px 16px;font-size:10px;font-weight:700;text-transform:uppercase;
+  letter-spacing:.08em;border:1px solid var(--line-2)}
+#dialForm button:hover{background:var(--hover-2)}
+#dialForm button.solid{background:var(--text);color:var(--bg);border-color:var(--text)}
+#dialForm button.solid:hover{background:var(--btn-h)}
+
+/* ---------------- stage ---------------- */
+#stage{flex:1 1 auto;position:relative;min-height:0;background:var(--bg)}
+webview.wv{position:absolute;inset:0;visibility:hidden;background:#fff}
+webview.wv.on{visibility:visible}
+webview.wv.htmlfs{position:fixed;inset:0;z-index:120;visibility:visible}
+
+/* ---------------- start page ---------------- */
+#start{position:absolute;inset:0;display:none;overflow-y:auto}
+#start.on{display:block}
+.st-wrap{max-width:660px;margin:0 auto;padding:9vh 24px 40px;display:flex;flex-direction:column;align-items:center}
+.st-clock{font-size:15px;font-weight:600;color:var(--dim);letter-spacing:.04em;margin-bottom:4vh}
+.st-clock b{color:var(--text);font-weight:700}
+.st-logo{margin-bottom:5vh}
+.st-search{width:100%;height:44px;border:1px solid var(--line-2);display:flex;align-items:center;margin-bottom:6vh}
+.st-search:focus-within{border-color:var(--text)}
+.st-search .si{width:44px;display:flex;align-items:center;justify-content:center;color:var(--dim)}
+.st-search input{flex:1;background:none;border:0;outline:0;color:var(--text);font-size:14.5px;font-weight:500;height:100%;user-select:text}
+.st-search input::placeholder{color:var(--dim-2)}
+.st-h{align-self:flex-start;font-size:9.5px;text-transform:uppercase;letter-spacing:.16em;color:var(--dim);
+  font-weight:500;margin:0 0 10px}
+.st-grid{width:100%;display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:34px}
+.st-tile{border:1px solid var(--line);padding:14px 10px 12px;display:flex;flex-direction:column;
+  align-items:center;gap:9px;cursor:default;min-width:0}
+.st-tile:hover{background:var(--hover);border-color:var(--line-2)}
+.st-tile .tg{width:34px;height:34px;display:flex;align-items:center;justify-content:center;
+  font-size:19px;font-weight:800;border:1px solid var(--line-3);color:var(--text)}
+.st-tile .tl{font-size:10.5px;font-weight:600;color:var(--dim);max-width:100%;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.st-tile:hover .tl{color:var(--text-2)}
+.st-bm{width:100%;display:flex;flex-wrap:wrap;gap:8px;margin-bottom:34px}
+.st-bml{border:1px solid var(--line-3);padding:7px 12px;font-size:11.5px;font-weight:600;color:var(--text-2);
+  max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:default}
+.st-bml:hover{background:var(--hover);color:var(--text)}
+.st-foot{margin-top:auto;padding-top:5vh;font-size:10.5px;color:var(--dim-2);text-align:center;line-height:1.6}
+
+/* ---------------- error overlay ---------------- */
+#errov{position:absolute;inset:0;display:none;align-items:center;justify-content:center;background:var(--bg);z-index:5}
+#errov.on{display:flex}
+.err-card{max-width:460px;padding:34px;border:1px solid var(--line);text-align:left}
+.err-card h2{font-size:19px;font-weight:800;margin-bottom:12px}
+.err-card .eu{font-size:12px;color:var(--dim);word-break:break-all;margin-bottom:6px}
+.err-card .ed{font-size:12.5px;color:var(--dim);font-family:Consolas,monospace;margin-bottom:22px}
+.err-card button{padding:9px 22px;background:var(--text);color:var(--bg);font-size:11px;
+  font-weight:700;text-transform:uppercase;letter-spacing:.08em}
+.err-card button:hover{background:var(--btn-h)}
+
+/* ---------------- side panels ---------------- */
+.panel{position:absolute;top:0;right:0;bottom:0;width:min(380px,88vw);background:var(--bg);
+  border-left:1px solid var(--line);z-index:70;display:none;flex-direction:column}
+.panel.open{display:flex}
+.p-head{flex:0 0 auto;display:flex;align-items:center;gap:10px;padding:13px 16px;border-bottom:1px solid var(--line-3)}
+.p-head h3{font-size:9.5px;text-transform:uppercase;letter-spacing:.16em;font-weight:500;color:var(--dim);flex:1}
+.p-act{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--dim);padding:4px 8px}
+.p-act:hover{color:var(--text);background:var(--hover-2)}
+.p-x{width:26px;height:26px;display:flex;align-items:center;justify-content:center;color:var(--dim)}
+.p-x:hover{color:var(--text);background:var(--hover-2)}
+.p-search{flex:0 0 auto;margin:10px 16px 4px;border:1px solid var(--line);height:32px;display:flex;align-items:center}
+.p-search:focus-within{border-color:var(--text)}
+.p-search input{flex:1;background:none;border:0;outline:0;color:var(--text);font-size:12.5px;padding:0 12px;height:100%;user-select:text}
+.p-body{flex:1 1 auto;overflow-y:auto;padding:6px 0 16px}
+.p-day{font-size:9.5px;text-transform:uppercase;letter-spacing:.16em;color:var(--dim);font-weight:500;
+  padding:14px 16px 5px}
+.p-row{display:flex;align-items:center;gap:10px;padding:7px 16px;cursor:default;min-width:0}
+.p-row:hover{background:var(--hover)}
+.p-row .rt{flex:0 1 auto;min-width:0;font-size:12.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.p-row .ru{flex:1 1 auto;min-width:0;font-size:11px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.p-row .rx{flex:0 0 auto;width:20px;height:20px;display:none;align-items:center;justify-content:center;color:var(--dim-2)}
+.p-row:hover .rx{display:flex}
+.p-row .rx:hover{color:var(--danger)}
+.p-empty{padding:40px 16px;text-align:center;color:var(--dim-2);font-size:12.5px}
+/* downloads */
+.dl{padding:11px 16px;border-bottom:1px solid var(--line-3)}
+.dl .dn{font-size:12.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:3px}
+.dl .ds{font-size:11px;color:var(--dim);margin-bottom:7px}
+.dl .dbar{height:2px;background:var(--line-3);margin-bottom:8px}
+.dl .dbar i{display:block;height:100%;background:var(--accent);width:0}
+.dl.done .dbar i{background:var(--ok)}
+.dl .dact{display:flex;gap:6px}
+.dl .da{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--dim);
+  border:1px solid var(--line-3);padding:4px 10px}
+.dl .da:hover{color:var(--text);border-color:var(--line-2)}
+
+/* ---------------- find bar ---------------- */
+#findbar{position:absolute;top:0;right:16px;z-index:80;display:none;align-items:center;gap:4px;
+  background:var(--bg);border:1px solid var(--line);border-top:0;padding:6px 8px}
+#findbar.open{display:flex}
+#findbar input{width:190px;background:none;border:0;outline:0;color:var(--text);font-size:12.5px;
+  border-bottom:1px solid var(--line-2);padding:3px 2px;user-select:text}
+#findbar input:focus{border-bottom-color:var(--text)}
+#findN{font-size:10.5px;color:var(--dim);min-width:44px;text-align:center}
+.fbtn{width:24px;height:24px;display:flex;align-items:center;justify-content:center;color:var(--dim)}
+.fbtn:hover{color:var(--text);background:var(--hover-2)}
+
+/* ---------------- menu ---------------- */
+#menu{position:absolute;top:2px;right:8px;z-index:90;min-width:230px;background:var(--bg);
+  border:1px solid var(--line);display:none;padding:5px 0}
+#menu.open{display:block}
+.m-row{display:flex;align-items:center;gap:11px;width:100%;padding:8px 15px;font-size:12.5px;
+  font-weight:600;text-align:left;color:var(--text-2)}
+.m-row:hover{background:var(--hover);color:var(--text)}
+.m-row .mk{margin-left:auto;font-size:10px;color:var(--dim-2);font-weight:500}
+.m-sep{height:1px;background:var(--line-3);margin:5px 0}
+.m-zoom{display:flex;align-items:center;gap:0;padding:4px 15px 6px}
+.m-zoom span{flex:1;font-size:12.5px;font-weight:600;color:var(--text-2)}
+.m-zoom button{width:26px;height:26px;display:flex;align-items:center;justify-content:center;
+  border:1px solid var(--line-3);color:var(--text-2)}
+.m-zoom button:hover{background:var(--hover-2)}
+.m-zoom b{width:52px;text-align:center;font-size:11.5px;font-weight:700}
+
+/* ---------------- settings modal ---------------- */
+#shade{position:absolute;inset:0;background:rgba(0,0,0,.6);z-index:100;display:none;
+  align-items:flex-start;justify-content:center;padding:6vh 20px}
+:root[data-theme="light"] #shade{background:rgba(0,0,0,.35)}
+#shade.open{display:flex}
+.modal{width:min(520px,100%);max-height:82vh;background:var(--bg);border:1px solid var(--line);
+  display:flex;flex-direction:column}
+.mo-head{display:flex;align-items:center;padding:14px 18px;border-bottom:1px solid var(--line-3)}
+.mo-head h2{font-size:15px;font-weight:800;flex:1}
+.mo-body{overflow-y:auto}
+.set-h{font-size:9.5px;text-transform:uppercase;letter-spacing:.16em;color:var(--dim);font-weight:500;
+  padding:16px 18px 6px}
+.set-row{display:flex;align-items:center;gap:12px;padding:10px 18px;width:100%;text-align:left;font-size:13px;font-weight:600}
+button.set-row:hover{background:var(--hover)}
+.set-row .sr{margin-left:auto;color:var(--dim);font-size:11.5px;font-weight:500}
+.set-row .tick{margin-left:auto;color:var(--text)}
+.set-note{padding:2px 18px 12px;font-size:11px;color:var(--dim-2);line-height:1.55}
+.set-danger{color:var(--danger)}
+.about{padding:8px 18px 20px;font-size:11.5px;color:var(--dim);line-height:1.8}
+.about b{color:var(--text)}
+
+/* ---------------- status bubble / toasts ---------------- */
+#status{position:absolute;left:0;bottom:0;z-index:40;max-width:60%;background:var(--bg);
+  border:1px solid var(--line-3);border-left:0;border-bottom:0;padding:4px 10px;font-size:11px;
+  color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:none}
+#status.on{display:block}
+#toasts{position:absolute;left:14px;bottom:14px;z-index:110;display:flex;flex-direction:column;gap:8px}
+.toast{background:var(--bg);border:1px solid var(--line);padding:10px 16px;font-size:12.5px;font-weight:600;
+  max-width:340px;animation:tin .18s ease-out}
+@keyframes tin{from{transform:translateY(8px);opacity:0}to{transform:none;opacity:1}}
+</style>
+</head>
+<body>
+
+<div id="cap">
+  <div id="capLogo"></div>
+  <div id="tabs"></div>
+  <button id="ntb" title="New tab (Ctrl+T)"></button>
+  <div id="capPad"></div>
+</div>
+
+<div id="bar">
+  <button class="nbtn" id="bBack" title="Back (Alt+Left)"></button>
+  <button class="nbtn" id="bFwd" title="Forward (Alt+Right)"></button>
+  <button class="nbtn" id="bRel" title="Reload (Ctrl+R)"></button>
+  <div id="omni">
+    <span id="secIc"></span>
+    <input id="addr" spellcheck="false" autocomplete="off" placeholder="Search or enter address">
+    <button id="star" title="Bookmark (Ctrl+D)"></button>
+    <div id="sug"></div>
+  </div>
+  <button class="nbtn rel" id="bDl" title="Downloads (Ctrl+J)"></button>
+  <button class="nbtn" id="bMenu" title="Menu"></button>
+</div>
+<div id="prog"><i></i></div>
+
+<div id="permbar">
+  <span id="permTxt"></span>
+  <span class="sp"></span>
+  <label class="pchk"><input type="checkbox" id="permRem">Remember for this site</label>
+  <button class="pbtn" id="permNo">Block</button>
+  <button class="pbtn solid" id="permYes">Allow</button>
+</div>
+
+<div id="main">
+<div id="side">
+  <button class="sbtn" id="sHome" title="Speed Dial"></button>
+  <button class="sbtn" id="sPanel" title="KONEKT panel"></button>
+  <button class="sbtn" id="sBm" title="Bookmarks"></button>
+  <button class="sbtn" id="sHist" title="History (Ctrl+H)"></button>
+  <button class="sbtn" id="sDlB" title="Downloads (Ctrl+J)"></button>
+  <span class="s-sp"></span>
+  <button class="sbtn" id="sShield" title="Ad &amp; tracker blocker"></button>
+  <button class="sbtn" id="sSet" title="Settings"></button>
+</div>
+
+<div id="kpanel">
+  <div class="kp-head"><span id="kpLogo"></span><span class="kp-t">KONEKT</span><span class="sp"></span>
+    <button class="p-x" id="kpOpen" title="Open in a tab"></button>
+    <button class="p-x" id="kpX" title="Close panel"></button></div>
+  <div id="kpBody"></div>
+</div>
+
+<div id="stage">
+  <div id="start"></div>
+  <div id="errov"></div>
+
+  <div class="panel" id="pHist">
+    <div class="p-head"><h3>History</h3><button class="p-act" id="histClear">Clear</button><button class="p-x" data-close="pHist"></button></div>
+    <div class="p-search"><input id="histQ" placeholder="Search history" spellcheck="false"></div>
+    <div class="p-body" id="histBody"></div>
+  </div>
+
+  <div class="panel" id="pDl">
+    <div class="p-head"><h3>Downloads</h3><button class="p-act" id="dlClear">Clear list</button><button class="p-x" data-close="pDl"></button></div>
+    <div class="p-body" id="dlBody"></div>
+  </div>
+
+  <div class="panel" id="pBm">
+    <div class="p-head"><h3>Bookmarks</h3><button class="p-x" data-close="pBm"></button></div>
+    <div class="p-body" id="bmBody"></div>
+  </div>
+
+  <div id="findbar">
+    <input id="findQ" placeholder="Find in page" spellcheck="false">
+    <span id="findN"></span>
+    <button class="fbtn" id="findPrev" title="Previous"></button>
+    <button class="fbtn" id="findNext" title="Next"></button>
+    <button class="fbtn" id="findX" title="Close (Esc)"></button>
+  </div>
+
+  <div id="menu"></div>
+
+  <div id="shade">
+    <div class="modal">
+      <div class="mo-head"><h2>Settings</h2><button class="p-x" id="setX"></button></div>
+      <div class="mo-body" id="setBody"></div>
+    </div>
+  </div>
+
+  <div id="status"></div>
+  <div id="toasts"></div>
+</div>
+</div>
+
+<script>
+'use strict';
+/* ================================================================
+   KONEKT BROWSER — chrome logic. Vanilla JS, zero deps.
+   ================================================================ */
+const bridge = window.konektBridge;
+const $ = s => document.querySelector(s);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const START = 'konekt://start';
+const PARTITION = 'persist:konekt';
+
+/* ---------------------- icons (stroke, 1.7px, cubic) ---------------------- */
+function ic(name, size){
+  size = size || 17;
+  const P = {
+    back:'M15 4 7 12l8 8', fwd:'M9 4l8 8-8 8',
+    reload:'M20 12a8 8 0 1 1-2.34-5.66M20 3v4h-4',
+    x:'M5 5l14 14M19 5 5 19', plus:'M12 4v16M4 12h16',
+    search:'M15.5 15.5 21 21M17 10.5a6.5 6.5 0 1 1-13 0 6.5 6.5 0 0 1 13 0',
+    star:'M12 3.6l2.6 5.3 5.8.8-4.2 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8-4.2-4.1 5.8-.8z',
+    dl:'M12 3v12m0 0 5-5m-5 5-5-5M4 20h16',
+    dots:'M12 5.2v.1M12 12v.1M12 18.8v.1',
+    lock:'M6 11V8a6 6 0 0 1 12 0v3M5 11h14v9H5z',
+    unlock:'M9 11V8a6 6 0 0 1 11.6-2M5 11h14v9H5z',
+    globe:'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM3 12h18M12 3c-2.5 2.4-3.8 5.5-3.8 9s1.3 6.6 3.8 9c2.5-2.4 3.8-5.5 3.8-9S14.5 5.4 12 3z',
+    up:'M6 14l6-6 6 6', down:'M6 10l6 6 6-6',
+    clock:'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zm0-14v5l3.5 2.5',
+    trash:'M5 7h14M10 7V5h4v2m-7 0 .7 13h8.6L17 7M10 11v6M14 11v6',
+    folder:'M3 6h6l2 2h10v12H3z',
+    gear:'M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM12 2.8l.9 2.6 2.6-1 1.5 2.2 2.7.4-.3 2.7 2.2 1.6-1.6 2.2 1 2.5-2.5 1.2-.1 2.7-2.7.1-1.3 2.4-2.4-1.2-2.4 1.2-1.3-2.4-2.7-.1-.1-2.7-2.5-1.2 1-2.5L2.4 12l2.2-1.6-.3-2.7 2.7-.4 1.5-2.2 2.6 1z',
+    spk:'M4 9v6h4l5 4V5L8 9H4zm12 0a5 5 0 0 1 0 6',
+    mute:'M4 9v6h4l5 4V5L8 9H4zm16-1-6 8m0-8 6 8',
+    hist:'M4 12a8 8 0 1 1 2.3 5.6M4 12l-1.8-2M4 12l2.4-1.4M12 7.5V12l3 2',
+    file:'M6 3h8l4 4v14H6zM14 3v4h4',
+    find:'M15.5 15.5 21 21M17 10.5a6.5 6.5 0 1 1-13 0 6.5 6.5 0 0 1 13 0M8 10.5h5M10.5 8v5',
+    print:'M7 8V3h10v5M5 8h14v8h-3v5H8v-5H5zM8 16h8',
+    code:'M8 6 3 12l5 6M16 6l5 6-5 6',
+    home:'M4 11l8-7 8 7M6.5 9.6V20h11V9.6',
+    shield:'M12 3l7 2.6v5.1c0 4.6-2.9 8.5-7 10.3-4.1-1.8-7-5.7-7-10.3V5.6z',
+    out:'M13 5h6v6M19 5l-9 9M9 6H5v13h13v-4',
+    pip:'M3 6h18v12H3zM12 12h7v5h-7z',
+    book:'M5 4h6a2 2 0 0 1 2 2v14a2 2 0 0 0-2-2H5zM19 4h-6a2 2 0 0 0-2 2v14a2 2 0 0 1 2-2h6z'
+  }[name];
+  return '<svg viewBox="0 0 24 24" width="'+size+'" height="'+size+'" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="'+P+'"/></svg>';
+}
+function icStarFill(size){
+  size = size || 17;
+  return '<svg viewBox="0 0 24 24" width="'+size+'" height="'+size+'" fill="currentColor" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M12 3.6l2.6 5.3 5.8.8-4.2 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8-4.2-4.1 5.8-.8z"/></svg>';
+}
+
+/* ---------------------- the KONEKT mark ---------------------- */
+function globe(px, weight){
+  const R = 50, w = weight || 7.4;
+  let lat = '';
+  [0, .43, -.43, .76, -.76].forEach(function(f){
+    const y = R*f, hw = Math.sqrt(Math.max(R*R - y*y, 0)) - w*0.18;
+    lat += '<line x1="'+(-hw).toFixed(1)+'" y1="'+y.toFixed(1)+'" x2="'+hw.toFixed(1)+'" y2="'+y.toFixed(1)+'"/>';
+  });
+  return '<svg class="gl" viewBox="-56 -56 112 112" width="'+px+'" height="'+px+'" aria-hidden="true">'+
+    '<g fill="none" stroke="currentColor" stroke-width="'+w+'">'+
+      '<circle cx="0" cy="0" r="'+R+'"/>'+
+      '<ellipse cx="0" cy="0" rx="'+(R*.36).toFixed(1)+'" ry="'+R+'"/>'+
+      '<ellipse cx="0" cy="0" rx="'+(R*.73).toFixed(1)+'" ry="'+R+'"/>'+
+      '<line x1="0" y1="'+(-R)+'" x2="0" y2="'+R+'"/>'+ lat +
+    '</g></svg>';
+}
+function logoShort(fs){
+  fs = fs || 26;
+  return '<span class="lg" style="font-size:'+fs+'px" aria-label="KONEKT">'+
+    '<span class="lg-t">K</span>'+globe(Math.round(fs*.78))+'</span>';
+}
+function logoLong(fs){
+  fs = fs || 26;
+  return '<span class="lg" style="font-size:'+fs+'px" aria-label="KONEKT">'+
+    '<span class="lg-t">K</span>'+globe(Math.round(fs*.78))+'<span class="lg-t">NEKT</span></span>';
+}
+
+/* ---------------------- storage ---------------------- */
+function load(k, d){ try { const v = JSON.parse(localStorage.getItem(k)); return v == null ? d : v; } catch { return d; } }
+function save(k, v){ try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }
+
+const settings = Object.assign({ engine:'google', theme:'dark', restore:true, homepage:'', adblock:true, kpanel:false }, load('kb.settings', {}));
+let bookmarks = load('kb.bookmarks', []);       // [{u,t,ts}]
+let history   = load('kb.history', []);         // [{u,t,ts}] newest last
+let closed    = load('kb.closed', []);          // recently closed urls
+let dials     = load('kb.dials', []);           // custom speed-dial tiles [{u,t}]
+const saveSettings = () => save('kb.settings', settings);
+
+const ENGINES = {
+  google:     { n:'Google',     q:'https://www.google.com/search?q=' },
+  duckduckgo: { n:'DuckDuckGo', q:'https://duckduckgo.com/?q=' },
+  bing:       { n:'Bing',       q:'https://www.bing.com/search?q=' },
+  yandex:     { n:'Yandex',     q:'https://yandex.com/search/?text=' }
+};
+const searchURL = q => ENGINES[settings.engine].q + encodeURIComponent(q);
+
+function toURL(q){
+  q = (q || '').trim();
+  if (!q) return null;
+  if (q === START || q === 'konekt://start') return START;
+  if (/^(https?|file|data|about):/i.test(q)) return q;
+  if (/^localhost(:\d+)?([\/?#]|$)/i.test(q)) return 'http://' + q;
+  if (/^\d{1,3}(\.\d{1,3}){3}(:\d+)?([\/?#]|$)/.test(q)) return 'http://' + q;
+  if (!/\s/.test(q) && /^[\w-]+(\.[\w-]+)+(:\d+)?([\/?#].*)?$/.test(q)) return 'https://' + q;
+  return searchURL(q);
+}
+
+/* ---------------------- tabs ---------------------- */
+const ZOOMS = [.25,.33,.5,.67,.75,.8,.9,1,1.1,1.25,1.5,1.75,2,2.5,3,4,5];
+let tabs = [], activeId = null, tabSeq = 0;
+const T = id => tabs.find(t => t.id === id);
+const AT = () => T(activeId);
+
+function newTab(url, background){
+  const t = { id:++tabSeq, url:url || START, title:'New tab', fav:null, loading:false,
+              canBack:false, canFwd:false, wv:null, ready:false, audible:false, muted:false,
+              err:null, zoom:1 };
+  tabs.push(t);
+  if (t.url !== START) attach(t, t.url);
+  if (!background || !activeId) activate(t.id);
+  else { renderTabs(); persistSession(); }
+  return t;
+}
+
+function attach(t, url){
+  if (t.wv){ navWv(t, url); return; }
+  const wv = document.createElement('webview');
+  wv.className = 'wv';
+  wv.setAttribute('partition', PARTITION);
+  wv.setAttribute('allowpopups', '');
+  wv.setAttribute('src', url);
+  t.wv = wv; t.url = url; t.err = null;
+  wireWv(t, wv);
+  $('#stage').insertBefore(wv, $('#start'));
+  if (t.id === activeId) wv.classList.add('on');
+}
+function navWv(t, url){
+  t.err = null;
+  if (t.ready){ try { t.wv.loadURL(url); return; } catch {} }
+  t.wv.setAttribute('src', url);
+}
+
+function navigate(t, input){
+  const url = toURL(input);
+  if (!url) return;
+  if (url === START){
+    t.url = START; t.title = 'New tab'; t.fav = null; t.err = null;
+    if (t.wv){ t.wv.remove(); t.wv = null; t.ready = false; }
+    renderAll(); return;
+  }
+  if (!t.wv) attach(t, url);
+  else if (t.url === url && t.ready) t.wv.reload();
+  else navWv(t, url);
+  t.url = url;
+  renderAll();
+}
+
+function activate(id){
+  activeId = id;
+  tabs.forEach(t => { if (t.wv) t.wv.classList.toggle('on', t.id === id); });
+  renderAll();
+  const t = AT();
+  if (t && t.wv && t.ready) t.wv.focus();
+  if (t && t.url === START) setTimeout(() => { const i = $('#stSearch'); if (i) i.focus(); }, 0);
+  persistSession();
+}
+
+function closeTab(id){
+  const i = tabs.findIndex(t => t.id === id);
+  if (i < 0) return;
+  const t = tabs[i];
+  if (t.url && t.url !== START){ closed.unshift(t.url); closed = closed.slice(0, 20); save('kb.closed', closed); }
+  if (t.wv) t.wv.remove();
+  tabs.splice(i, 1);
+  if (!tabs.length){ newTab(START); return; }
+  if (activeId === id) activate(tabs[Math.min(i, tabs.length - 1)].id);
+  else { renderTabs(); persistSession(); }
+}
+
+function reopenClosed(){
+  const u = closed.shift();
+  save('kb.closed', closed);
+  if (u) newTab(u);
+}
+
+/* ---------------------- webview wiring ---------------------- */
+function hostOf(u){ try { return new URL(u).hostname.replace(/^www\./,''); } catch { return ''; } }
+
+function wireWv(t, wv){
+  wv.addEventListener('dom-ready', () => {
+    t.ready = true;
+    try { wv.setZoomFactor(t.zoom); } catch {}
+  });
+  wv.addEventListener('did-start-loading', () => { t.loading = true; t.err = null; renderTabs(); renderNav(); progress(true); });
+  wv.addEventListener('did-stop-loading', () => { t.loading = false; renderTabs(); renderNav(); progress(false); });
+  wv.addEventListener('page-title-updated', e => {
+    t.title = e.title || t.title;
+    const h = history.findLast ? history.findLast(x => x.u === t.url) : null;
+    if (h) { h.t = e.title; save('kb.history', history); }
+    renderTabs(); persistSession();
+  });
+  wv.addEventListener('page-favicon-updated', e => { t.fav = (e.favicons && e.favicons[0]) || null; renderTabs(); });
+  wv.addEventListener('did-navigate', e => {
+    t.url = e.url; t.err = null;
+    updateNavCaps(t); recordHistory(e.url, t.title); renderAll(); persistSession();
+  });
+  wv.addEventListener('did-navigate-in-page', e => {
+    if (!e.isMainFrame) return;
+    t.url = e.url; updateNavCaps(t); recordHistory(e.url, t.title); renderOmni(); persistSession();
+  });
+  wv.addEventListener('did-fail-load', e => {
+    if (!e.isMainFrame || e.errorCode === -3 || e.errorCode === 0) return;
+    t.err = { code: e.errorCode, desc: e.errorDescription, url: e.validatedURL || t.url };
+    t.loading = false; renderAll(); progress(false);
+  });
+  wv.addEventListener('render-process-gone', () => {
+    t.err = { code: 0, desc: 'The page crashed', url: t.url };
+    renderAll();
+  });
+  wv.addEventListener('update-target-url', e => {
+    const s = $('#status');
+    if (e.url){ s.textContent = e.url; s.classList.add('on'); }
+    else s.classList.remove('on');
+  });
+  wv.addEventListener('enter-html-full-screen', () => wv.classList.add('htmlfs'));
+  wv.addEventListener('leave-html-full-screen', () => wv.classList.remove('htmlfs'));
+  wv.addEventListener('media-started-playing', () => { t.audible = true; renderTabs(); });
+  wv.addEventListener('media-paused', () => { t.audible = false; renderTabs(); });
+  wv.addEventListener('found-in-page', e => {
+    if (e.result) $('#findN').textContent = e.result.activeMatchOrdinal + '/' + e.result.matches;
+  });
+}
+function updateNavCaps(t){
+  try { t.canBack = t.wv.canGoBack(); t.canFwd = t.wv.canGoForward(); } catch {}
+}
+
+/* ---------------------- history ---------------------- */
+function recordHistory(url, title){
+  if (!url || url === START || /^(data|about|chrome):/i.test(url)) return;
+  const last = history[history.length - 1];
+  if (last && last.u === url) { last.ts = Date.now(); return; }
+  history.push({ u: url, t: title || hostOf(url) || url, ts: Date.now() });
+  if (history.length > 2500) history = history.slice(-2200);
+  save('kb.history', history);
+}
+
+/* ---------------------- rendering ---------------------- */
+function renderAll(){ renderTabs(); renderNav(); renderOmni(); renderStart(); renderErr(); }
+
+function renderTabs(){
+  const box = $('#tabs');
+  box.innerHTML = tabs.map(t => {
+    const on = t.id === activeId;
+    const fav = t.loading
+      ? '<span class="tload"></span>'
+      : '<span class="tfav">' + (t.fav && t.url !== START
+          ? '<img src="'+esc(t.fav)+'" onerror="this.remove()">'
+          : (t.url === START ? globe(13, 9) : '<span class="glyph">'+esc((hostOf(t.url)[0]||'·').toUpperCase())+'</span>')) + '</span>';
+    const snd = '<button class="tsnd" data-snd="'+t.id+'" title="'+(t.muted?'Unmute':'Mute')+'">'
+      + (t.muted ? ic('mute',12) : ic('spk',12)) + '</button>';
+    return '<div class="tab'+(on?' on':'')+(t.audible?' audible':'')+(t.muted?' muted':'')+'" draggable="true" data-tab="'+t.id+'" title="'+esc(t.title)+'">'
+      + fav + '<span class="ttitle">'+esc(t.title || 'New tab')+'</span>' + snd
+      + '<button class="tx" data-x="'+t.id+'">'+ic('x',11)+'</button></div>';
+  }).join('');
+}
+
+function renderNav(){
+  const t = AT(); if (!t) return;
+  $('#bBack').disabled = !(t.wv && t.canBack);
+  $('#bFwd').disabled = !(t.wv && t.canFwd);
+  $('#bRel').innerHTML = t.loading ? ic('x',15) : ic('reload',15);
+  $('#bRel').title = t.loading ? 'Stop (Esc)' : 'Reload (Ctrl+R)';
+  document.title = (t.title && t.title !== 'New tab' ? t.title + ' — ' : '') + 'KONEKT Browser';
+}
+
+function renderOmni(){
+  const t = AT(); if (!t) return;
+  const a = $('#addr');
+  if (document.activeElement !== a) a.value = t.url === START ? '' : t.url;
+  const sec = $('#secIc');
+  if (t.url === START){ sec.className=''; sec.innerHTML = globe(14, 8.5); }
+  else if (/^https:/i.test(t.url)){ sec.className='safe'; sec.innerHTML = ic('lock',13); }
+  else if (/^http:/i.test(t.url)){ sec.className='unsafe'; sec.innerHTML = ic('unlock',13); sec.title='Not secure'; }
+  else { sec.className=''; sec.innerHTML = ic('file',13); }
+  const bm = bookmarks.some(b => b.u === t.url);
+  $('#star').className = bm ? 'on' : '';
+  $('#star').innerHTML = bm ? icStarFill(15) : ic('star',15);
+}
+
+function progress(run){
+  const p = $('#prog'), i = $('#prog i');
+  clearTimeout(progress._t1); clearTimeout(progress._t2);
+  if (run){
+    p.classList.add('run'); i.style.width = '12%';
+    let w = 12;
+    const step = () => { w = Math.min(w + (85 - w) * .18, 85); i.style.width = w + '%';
+      progress._t1 = setTimeout(step, 320); };
+    progress._t1 = setTimeout(step, 200);
+  } else {
+    i.style.width = '100%';
+    progress._t2 = setTimeout(() => { p.classList.remove('run'); i.style.width = '0'; }, 380);
+  }
+}
+
+/* ---------------------- start page ---------------------- */
+function topSites(){
+  const agg = {};
+  for (const h of history){
+    const host = hostOf(h.u); if (!host) continue;
+    if (!agg[host]) agg[host] = { host, n:0, u:h.u, ts:h.ts };
+    agg[host].n++;
+    if (h.ts >= agg[host].ts){ agg[host].u = h.u; agg[host].ts = h.ts; }
+  }
+  return Object.values(agg).sort((a,b) => b.n - a.n).slice(0, 7);
+}
+function clockStr(){
+  const d = new Date();
+  const hh = String(d.getHours()).padStart(2,'0'), mm = String(d.getMinutes()).padStart(2,'0');
+  const day = d.toLocaleDateString('en-GB', { weekday:'long', day:'numeric', month:'long' });
+  return '<b>'+hh+':'+mm+'</b> · '+day;
+}
+function renderStart(){
+  const t = AT(); if (!t) return;
+  const on = t.url === START && !t.err;
+  $('#start').classList.toggle('on', on);
+  if (!on) return;
+  const tiles = dials.map(d => ({ host: d.t || hostOf(d.u) || d.u, u: d.u, del: d.u }))
+    .concat([{ host:'KONEKT', u:'https://konekt-tawny.vercel.app', mark:true }])
+    .concat(topSites()).slice(0, 11);
+  $('#start').innerHTML = '<div class="st-wrap">'
+    + '<div class="st-clock" id="stClock">'+clockStr()+'</div>'
+    + '<div class="st-logo">'+logoLong(46)+'</div>'
+    + '<div class="st-search"><span class="si">'+ic('search',16)+'</span>'
+    + '<input id="stSearch" placeholder="Search '+esc(ENGINES[settings.engine].n)+' or enter address" spellcheck="false"></div>'
+    + '<h4 class="st-h">Speed Dial</h4>'
+    + '<div class="st-grid">' + tiles.map(s =>
+        '<div class="st-tile" data-go="'+esc(s.u)+'" title="'+esc(s.u)+'"><span class="tg">'
+        + (s.mark ? globe(24, 8) : esc((String(s.host)[0]||'·').toUpperCase()))
+        + '</span><span class="tl">'+esc(s.host)+'</span>'
+        + (s.del ? '<button class="tdel" data-deldial="'+esc(s.del)+'" title="Remove">'+ic('x',10)+'</button>' : '')
+        + '</div>').join('')
+    + '<div class="st-tile" id="stAdd"><span class="tg">'+ic('plus',18)+'</span><span class="tl">Add site</span></div>'
+    + '</div>'
+    + '<div id="dialForm"><input id="dfUrl" placeholder="Address — e.g. konekt.network" spellcheck="false">'
+    + '<input id="dfTitle" placeholder="Name (optional)" spellcheck="false">'
+    + '<div class="dfr"><button id="dfCancel">Cancel</button><button class="solid" id="dfAdd">Add</button></div></div>'
+    + (bookmarks.length ? '<h4 class="st-h">Bookmarks</h4><div class="st-bm">'
+        + bookmarks.slice(0, 10).map(b => '<div class="st-bml" data-go="'+esc(b.u)+'">'+esc(b.t || b.u)+'</div>').join('')
+        + '</div>' : '')
+    + '<div class="st-foot">© 2026 KONEKT · NKO Intl. Foundation of Technological Research &amp; Development</div>'
+    + '</div>';
+  const inp = $('#stSearch');
+  inp.addEventListener('keydown', e => { if (e.key === 'Enter' && inp.value.trim()) navigate(AT(), inp.value); });
+  wireDialForm();
+  if (t.id === activeId) inp.focus();
+}
+function wireDialForm(){
+  const form = $('#dialForm'), addT = $('#stAdd');
+  if (!addT) return;
+  addT.onclick = () => { form.classList.add('open'); $('#dfUrl').focus(); };
+  $('#dfCancel').onclick = () => form.classList.remove('open');
+  const submit = () => {
+    let u = ($('#dfUrl').value || '').trim();
+    if (!u) return;
+    if (!/^[a-z]+:/i.test(u)) u = 'https://' + u;
+    dials.push({ u, t: ($('#dfTitle').value || '').trim() || hostOf(u) || u });
+    save('kb.dials', dials);
+    renderStart();
+  };
+  $('#dfAdd').onclick = submit;
+  $('#dfUrl').addEventListener('keydown', e => { if (e.key === 'Enter') submit(); });
+  $('#dfTitle').addEventListener('keydown', e => { if (e.key === 'Enter') submit(); });
+}
+setInterval(() => { const c = $('#stClock'); if (c) c.innerHTML = clockStr(); }, 15000);
+
+/* ---------------------- error overlay ---------------------- */
+function renderErr(){
+  const t = AT(), ov = $('#errov');
+  if (!t || !t.err){ ov.classList.remove('on'); return; }
+  ov.classList.add('on');
+  ov.innerHTML = '<div class="err-card"><h2>Can’t reach this page</h2>'
+    + '<div class="eu">'+esc(t.err.url || '')+'</div>'
+    + '<div class="ed">'+esc(t.err.desc || 'Unknown error')+(t.err.code ? ' ('+t.err.code+')' : '')+'</div>'
+    + '<button id="errRetry">Retry</button></div>';
+  $('#errRetry').onclick = () => { const tt = AT(); if (tt && tt.wv){ tt.err = null; renderErr(); tt.wv.reload(); } };
+}
+
+/* ---------------------- omnibox ---------------------- */
+const addr = $('#addr');
+let sugItems = [], sugHot = -1;
+function buildSug(q){
+  q = q.trim().toLowerCase();
+  sugItems = [];
+  if (q){
+    const seen = new Set();
+    for (let i = history.length - 1; i >= 0 && sugItems.length < 6; i--){
+      const h = history[i];
+      if (seen.has(h.u)) continue;
+      if (h.u.toLowerCase().includes(q) || (h.t || '').toLowerCase().includes(q)){
+        seen.add(h.u); sugItems.push({ kind:'hist', u:h.u, t:h.t });
+      }
+    }
+    sugItems.push({ kind:'search', u:searchURL(q), t:q });
+  }
+  sugHot = -1;
+  const el = $('#sug');
+  if (!sugItems.length){ el.classList.remove('open'); el.innerHTML=''; return; }
+  el.innerHTML = sugItems.map((s, i) =>
+    '<div class="sug" data-sug="'+i+'"><span class="si">'+(s.kind==='search'?ic('search',13):ic('hist',13))+'</span>'
+    + '<span class="st">'+esc(s.t || s.u)+'</span>'
+    + '<span class="su">'+(s.kind==='search' ? 'Search '+esc(ENGINES[settings.engine].n) : esc(s.u))+'</span></div>').join('');
+  el.classList.add('open');
+}
+function closeSug(){ $('#sug').classList.remove('open'); sugItems = []; sugHot = -1; }
+function hotSug(d){
+  if (!sugItems.length) return;
+  sugHot = (sugHot + d + sugItems.length) % sugItems.length;
+  document.querySelectorAll('.sug').forEach((el, i) => el.classList.toggle('hot', i === sugHot));
+  addr.value = sugItems[sugHot].kind === 'search' ? sugItems[sugHot].t : sugItems[sugHot].u;
+}
+addr.addEventListener('input', () => buildSug(addr.value));
+addr.addEventListener('keydown', e => {
+  if (e.key === 'Enter'){
+    const pick = sugHot >= 0 ? sugItems[sugHot].u : null;
+    const v = pick || addr.value;
+    closeSug(); addr.blur();
+    if (v.trim()) navigate(AT(), v);
+  }
+  else if (e.key === 'ArrowDown'){ e.preventDefault(); hotSug(1); }
+  else if (e.key === 'ArrowUp'){ e.preventDefault(); hotSug(-1); }
+  else if (e.key === 'Escape'){ closeSug(); renderOmni(); addr.blur(); }
+});
+addr.addEventListener('focus', () => setTimeout(() => addr.select(), 0));
+addr.addEventListener('blur', () => setTimeout(closeSug, 150));
+$('#sug').addEventListener('mousedown', e => {
+  const el = e.target.closest('[data-sug]');
+  if (!el) return;
+  e.preventDefault();
+  const s = sugItems[+el.dataset.sug];
+  closeSug(); addr.blur();
+  navigate(AT(), s.u);
+});
+
+/* ---------------------- toolbar ---------------------- */
+$('#bBack').onclick = () => { const t = AT(); if (t && t.wv) try { t.wv.goBack(); } catch {} };
+$('#bFwd').onclick = () => { const t = AT(); if (t && t.wv) try { t.wv.goForward(); } catch {} };
+$('#bRel').onclick = () => {
+  const t = AT(); if (!t) return;
+  if (!t.wv){ renderStart(); return; }
+  try { t.loading ? t.wv.stop() : t.wv.reload(); } catch {}
+};
+$('#ntb').onclick = () => { newTab(START); };
+$('#star').onclick = () => toggleBookmark();
+$('#bDl').onclick = () => togglePanel('pDl');
+$('#bMenu').onclick = e => { e.stopPropagation(); toggleMenu(); };
+
+function toggleBookmark(){
+  const t = AT(); if (!t || t.url === START) return;
+  const i = bookmarks.findIndex(b => b.u === t.url);
+  if (i >= 0){ bookmarks.splice(i, 1); toast('Bookmark removed'); }
+  else { bookmarks.unshift({ u:t.url, t:t.title || t.url, ts:Date.now() }); toast('Bookmarked'); }
+  save('kb.bookmarks', bookmarks);
+  renderOmni(); renderBm();
+}
+
+/* ---------------------- tab strip events ---------------------- */
+let dragId = null;
+$('#tabs').addEventListener('click', e => {
+  const x = e.target.closest('[data-x]');
+  if (x){ closeTab(+x.dataset.x); return; }
+  const s = e.target.closest('[data-snd]');
+  if (s){ const t = T(+s.dataset.snd); if (t && t.wv){ t.muted = !t.muted; try { t.wv.setAudioMuted(t.muted); } catch {} renderTabs(); } return; }
+  const el = e.target.closest('[data-tab]');
+  if (el) activate(+el.dataset.tab);
+});
+$('#tabs').addEventListener('auxclick', e => {
+  if (e.button !== 1) return;
+  const el = e.target.closest('[data-tab]');
+  if (el) closeTab(+el.dataset.tab);
+});
+$('#tabs').addEventListener('dragstart', e => {
+  const el = e.target.closest('[data-tab]');
+  if (!el){ e.preventDefault(); return; }
+  dragId = +el.dataset.tab;
+  e.dataTransfer.effectAllowed = 'move';
+});
+$('#tabs').addEventListener('dragover', e => {
+  e.preventDefault();
+  const el = e.target.closest('[data-tab]');
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('drop-l','drop-r'));
+  if (!el || +el.dataset.tab === dragId) return;
+  const r = el.getBoundingClientRect();
+  el.classList.add(e.clientX < r.left + r.width/2 ? 'drop-l' : 'drop-r');
+});
+$('#tabs').addEventListener('drop', e => {
+  e.preventDefault();
+  const el = e.target.closest('[data-tab]');
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('drop-l','drop-r'));
+  if (!el || dragId == null) return;
+  const from = tabs.findIndex(t => t.id === dragId);
+  let to = tabs.findIndex(t => t.id === +el.dataset.tab);
+  if (from < 0 || to < 0){ dragId = null; return; }
+  const r = el.getBoundingClientRect();
+  if (e.clientX >= r.left + r.width/2) to++;
+  const [mv] = tabs.splice(from, 1);
+  tabs.splice(from < to ? to - 1 : to, 0, mv);
+  dragId = null; renderTabs(); persistSession();
+});
+$('#tabs').addEventListener('dragend', () => {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('drop-l','drop-r'));
+  dragId = null;
+});
+$('#tabs').addEventListener('wheel', e => {
+  if (e.deltaY){ $('#tabs').scrollLeft += e.deltaY; }
+}, { passive:true });
+
+/* ---------------------- panels ---------------------- */
+function togglePanel(id){
+  const p = document.getElementById(id);
+  const was = p.classList.contains('open');
+  document.querySelectorAll('.panel').forEach(x => x.classList.remove('open'));
+  if (!was){
+    p.classList.add('open');
+    if (id === 'pHist') renderHist();
+    if (id === 'pDl') renderDl();
+    if (id === 'pBm') renderBm();
+  }
+  syncSide();
+}
+function syncSide(){
+  $('#sBm').classList.toggle('on', $('#pBm').classList.contains('open'));
+  $('#sHist').classList.toggle('on', $('#pHist').classList.contains('open'));
+  $('#sDlB').classList.toggle('on', $('#pDl').classList.contains('open'));
+}
+document.querySelectorAll('.p-x').forEach(b => {
+  b.innerHTML = ic('x',13);
+  if (b.dataset.close) b.onclick = () => document.getElementById(b.dataset.close).classList.remove('open');
+});
+$('#setX').onclick = () => $('#shade').classList.remove('open');
+
+/* history panel */
+function dayLabel(ts){
+  const d = new Date(ts), now = new Date();
+  const day = x => Math.floor((x - new Date(x).getTimezoneOffset()*60000) / 86400000);
+  const dd = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const nn = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const diff = Math.round((nn - dd) / 86400000);
+  if (diff === 0) return 'Today';
+  if (diff === 1) return 'Yesterday';
+  return d.toLocaleDateString('en-GB', { weekday:'long', day:'numeric', month:'long' });
+}
+function renderHist(){
+  const q = ($('#histQ').value || '').toLowerCase();
+  const items = history.slice().reverse().filter(h => !q || h.u.toLowerCase().includes(q) || (h.t||'').toLowerCase().includes(q)).slice(0, 400);
+  if (!items.length){ $('#histBody').innerHTML = '<div class="p-empty">Nothing here yet</div>'; return; }
+  let out = '', lastDay = '';
+  for (const h of items){
+    const dl = dayLabel(h.ts);
+    if (dl !== lastDay){ out += '<div class="p-day">'+dl+'</div>'; lastDay = dl; }
+    out += '<div class="p-row" data-go="'+esc(h.u)+'" title="'+esc(h.u)+'">'
+      + '<span class="rt">'+esc(h.t || h.u)+'</span><span class="ru">'+esc(hostOf(h.u))+'</span>'
+      + '<button class="rx" data-del="'+esc(h.u)+'|'+h.ts+'">'+ic('x',11)+'</button></div>';
+  }
+  $('#histBody').innerHTML = out;
+}
+$('#histQ').addEventListener('input', renderHist);
+$('#histClear').onclick = () => { history = []; save('kb.history', history); renderHist(); toast('History cleared'); };
+$('#histBody').addEventListener('click', e => {
+  const del = e.target.closest('[data-del]');
+  if (del){
+    const [u, ts] = del.dataset.del.split('|');
+    history = history.filter(h => !(h.u === u && String(h.ts) === ts));
+    save('kb.history', history); renderHist(); return;
+  }
+  const go = e.target.closest('[data-go]');
+  if (go){ togglePanel('pHist'); navigate(AT(), go.dataset.go); }
+});
+
+/* bookmarks panel */
+function renderBm(){
+  if (!bookmarks.length){ $('#bmBody').innerHTML = '<div class="p-empty">No bookmarks — press Ctrl+D on a page</div>'; return; }
+  $('#bmBody').innerHTML = bookmarks.map(b =>
+    '<div class="p-row" data-go="'+esc(b.u)+'" title="'+esc(b.u)+'">'
+    + '<span class="rt">'+esc(b.t || b.u)+'</span><span class="ru">'+esc(hostOf(b.u))+'</span>'
+    + '<button class="rx" data-del="'+esc(b.u)+'">'+ic('x',11)+'</button></div>').join('');
+}
+$('#bmBody').addEventListener('click', e => {
+  const del = e.target.closest('[data-del]');
+  if (del){ bookmarks = bookmarks.filter(b => b.u !== del.dataset.del); save('kb.bookmarks', bookmarks); renderBm(); renderOmni(); return; }
+  const go = e.target.closest('[data-go]');
+  if (go){ togglePanel('pBm'); navigate(AT(), go.dataset.go); }
+});
+
+/* downloads */
+const dls = new Map();
+function fmtSize(n){
+  if (!n && n !== 0) return '?';
+  if (n < 1024) return n + ' B';
+  if (n < 1048576) return (n/1024).toFixed(1) + ' KB';
+  if (n < 1073741824) return (n/1048576).toFixed(1) + ' MB';
+  return (n/1073741824).toFixed(2) + ' GB';
+}
+function renderDl(){
+  const items = [...dls.values()].sort((a,b) => b.ts - a.ts);
+  $('#bDl').innerHTML = ic('dl',16) + (items.some(d => d.state === 'progress' || d.state === 'started')
+    ? '<span class="badge">'+items.filter(d => d.state==='progress'||d.state==='started').length+'</span>' : '');
+  if (!$('#pDl').classList.contains('open')) return;
+  if (!items.length){ $('#dlBody').innerHTML = '<div class="p-empty">No downloads yet</div>'; return; }
+  $('#dlBody').innerHTML = items.map(d => {
+    const pct = d.total ? Math.round(d.received / d.total * 100) : (d.state === 'completed' ? 100 : 0);
+    const stat = d.state === 'completed' ? fmtSize(d.total || d.received)
+      : d.state === 'cancelled' ? 'Cancelled'
+      : d.state === 'interrupted' ? 'Failed'
+      : d.paused ? 'Paused — ' + fmtSize(d.received) + ' of ' + fmtSize(d.total)
+      : fmtSize(d.received) + ' of ' + fmtSize(d.total);
+    const acts = d.state === 'completed'
+      ? '<button class="da" data-dact="open|'+d.id+'">Open</button><button class="da" data-dact="show|'+d.id+'">Show in folder</button>'
+      : (d.state === 'progress' || d.state === 'started')
+      ? (d.paused ? '<button class="da" data-dact="resume|'+d.id+'">Resume</button>' : '<button class="da" data-dact="pause|'+d.id+'">Pause</button>')
+        + '<button class="da" data-dact="cancel|'+d.id+'">Cancel</button>'
+      : '';
+    return '<div class="dl'+(d.state==='completed'?' done':'')+'"><div class="dn" title="'+esc(d.path||'')+'">'+esc(d.filename)+'</div>'
+      + '<div class="ds">'+stat+'</div>'
+      + '<div class="dbar"><i style="width:'+pct+'%"></i></div>'
+      + (acts ? '<div class="dact">'+acts+'</div>' : '') + '</div>';
+  }).join('');
+}
+$('#dlClear').onclick = () => {
+  for (const [id, d] of [...dls]) if (d.state !== 'progress' && d.state !== 'started') dls.delete(id);
+  renderDl();
+};
+$('#dlBody').addEventListener('click', e => {
+  const a = e.target.closest('[data-dact]');
+  if (!a) return;
+  const [act, id] = a.dataset.dact.split('|');
+  const d = dls.get(+id);
+  if (!d) return;
+  if (act === 'open') bridge.send('shell-open', d.path);
+  else if (act === 'show') bridge.send('shell-show', d.path);
+  else bridge.send('dl-action', { id:+id, action:act });
+});
+
+/* ---------------------- find in page ---------------------- */
+const findQ = $('#findQ');
+$('#findPrev').innerHTML = ic('up',13); $('#findNext').innerHTML = ic('down',13); $('#findX').innerHTML = ic('x',13);
+function openFind(){
+  const t = AT(); if (!t || !t.wv) return;
+  $('#findbar').classList.add('open'); findQ.focus(); findQ.select();
+}
+function closeFind(){
+  $('#findbar').classList.remove('open'); $('#findN').textContent = '';
+  const t = AT(); if (t && t.wv && t.ready) try { t.wv.stopFindInPage('clearSelection'); } catch {}
+}
+function doFind(fwd, again){
+  const t = AT(); if (!t || !t.wv || !t.ready || !findQ.value) return;
+  try { t.wv.findInPage(findQ.value, { forward: fwd !== false, findNext: !again }); } catch {}
+}
+findQ.addEventListener('input', () => { if (findQ.value) doFind(true, true); else closeFind(); });
+findQ.addEventListener('keydown', e => {
+  if (e.key === 'Enter') doFind(!e.shiftKey, false);
+  if (e.key === 'Escape') closeFind();
+});
+$('#findNext').onclick = () => doFind(true, false);
+$('#findPrev').onclick = () => doFind(false, false);
+$('#findX').onclick = closeFind;
+
+/* ---------------------- zoom ---------------------- */
+function setZoom(t, z){
+  t.zoom = Math.max(ZOOMS[0], Math.min(ZOOMS[ZOOMS.length-1], z));
+  if (t.wv && t.ready) try { t.wv.setZoomFactor(t.zoom); } catch {}
+  const el = $('#mZoomV'); if (el) el.textContent = Math.round(t.zoom * 100) + '%';
+  if (Math.abs(t.zoom - 1) > .001) toast('Zoom ' + Math.round(t.zoom * 100) + '%');
+}
+function zoomStep(dir){
+  const t = AT(); if (!t) return;
+  let i = ZOOMS.findIndex(z => Math.abs(z - t.zoom) < .001);
+  if (i < 0) i = ZOOMS.findIndex(z => z > t.zoom) - (dir > 0 ? 1 : 0);
+  i = Math.max(0, Math.min(ZOOMS.length - 1, (i < 0 ? 7 : i) + dir));
+  setZoom(t, ZOOMS[i]);
+}
+
+/* ---------------------- menu ---------------------- */
+function toggleMenu(){
+  const m = $('#menu');
+  if (m.classList.contains('open')){ m.classList.remove('open'); return; }
+  const t = AT();
+  m.innerHTML =
+    mrow('plus','New tab','Ctrl+T','newtab')
+    + mrow('reload','Reopen closed tab','Ctrl+Shift+T','reopen')
+    + '<div class="m-sep"></div>'
+    + '<div class="m-zoom"><span>Zoom</span><button data-m="zout">−</button><b id="mZoomV">'
+    + Math.round(((t && t.zoom) || 1) * 100) + '%</b><button data-m="zin">+</button></div>'
+    + '<div class="m-sep"></div>'
+    + mrow('find','Find in page','Ctrl+F','find')
+    + mrow('pip','Pop out video','','pip')
+    + mrow('print','Print…','Ctrl+P','print')
+    + '<div class="m-sep"></div>'
+    + mrow('star','Bookmarks','','bm')
+    + mrow('hist','History','Ctrl+H','hist')
+    + mrow('dl','Downloads','Ctrl+J','dl')
+    + '<div class="m-sep"></div>'
+    + mrow('code','Developer tools','F12','dev')
+    + mrow('gear','Settings','','set');
+  m.classList.add('open');
+}
+function mrow(icn, label, key, act){
+  return '<button class="m-row" data-m="'+act+'">'+ic(icn,15)+esc(label)
+    + (key ? '<span class="mk">'+key+'</span>' : '')+'</button>';
+}
+$('#menu').addEventListener('click', e => {
+  const b = e.target.closest('[data-m]');
+  if (!b) return;
+  const act = b.dataset.m;
+  if (act !== 'zin' && act !== 'zout') $('#menu').classList.remove('open');
+  const t = AT();
+  if (act === 'newtab') newTab(START);
+  else if (act === 'reopen') reopenClosed();
+  else if (act === 'zin') zoomStep(1);
+  else if (act === 'zout') zoomStep(-1);
+  else if (act === 'find') openFind();
+  else if (act === 'pip') pipVideo();
+  else if (act === 'print'){ if (t && t.wv && t.ready) try { t.wv.print(); } catch {} }
+  else if (act === 'bm') togglePanel('pBm');
+  else if (act === 'hist') togglePanel('pHist');
+  else if (act === 'dl') togglePanel('pDl');
+  else if (act === 'dev'){ if (t && t.wv && t.ready) try { t.wv.openDevTools(); } catch {} }
+  else if (act === 'set') openSettings();
+});
+document.addEventListener('click', e => {
+  if (!e.target.closest('#menu') && !e.target.closest('#bMenu')) $('#menu').classList.remove('open');
+});
+
+/* ---------------------- settings ---------------------- */
+async function openSettings(){
+  const info = await bridge.info().catch(() => ({}));
+  const eng = k => '<button class="set-row" data-eng="'+k+'">'+esc(ENGINES[k].n)
+    + (settings.engine === k ? '<span class="tick">✓</span>' : '')+'</button>';
+  $('#setBody').innerHTML =
+    '<div class="set-h">Search engine</div>'
+    + Object.keys(ENGINES).map(eng).join('')
+    + '<div class="set-h">Appearance</div>'
+    + '<button class="set-row" data-set="theme">Theme<span class="sr">'+(settings.theme === 'dark' ? 'Dark' : 'Light')+'</span></button>'
+    + '<div class="set-h">On start</div>'
+    + '<button class="set-row" data-set="restore">Reopen previous tabs<span class="sr">'+(settings.restore ? 'On' : 'Off')+'</span></button>'
+    + '<div class="set-h">Privacy</div>'
+    + '<button class="set-row" data-set="adblock">Ad &amp; tracker blocker<span class="sr">'+(settings.adblock !== false ? 'On' : 'Off')+'</span></button>'
+    + '<button class="set-row" data-set="clear"><span class="set-danger">Clear browsing data</span></button>'
+    + '<div class="set-note">Wipes cookies, site storage and cache for every site, plus the local history list. Bookmarks stay.</div>'
+    + '<div class="set-h">About</div>'
+    + '<div class="about"><b>KONEKT Browser</b> '+esc(info.version || '')
+    + '<br>Chromium '+esc(info.chrome || '?')+' · Electron '+esc(info.electron || '?')+' · Node '+esc(info.node || '?')
+    + '<br>Downloads go to '+esc(info.downloads || '')
+    + '<br>© 2026 KONEKT · NKO Intl. Foundation of Technological Research &amp; Development</div>';
+  $('#shade').classList.add('open');
+}
+$('#setBody').addEventListener('click', e => {
+  const engB = e.target.closest('[data-eng]');
+  if (engB){ settings.engine = engB.dataset.eng; saveSettings(); openSettings(); renderStart(); return; }
+  const b = e.target.closest('[data-set]');
+  if (!b) return;
+  if (b.dataset.set === 'theme'){ settings.theme = settings.theme === 'dark' ? 'light' : 'dark'; applyTheme(); saveSettings(); openSettings(); }
+  else if (b.dataset.set === 'adblock'){
+    settings.adblock = settings.adblock === false;
+    saveSettings();
+    bridge.send('adblock-set', { on: settings.adblock });
+    renderShield(); openSettings();
+  }
+  else if (b.dataset.set === 'restore'){ settings.restore = !settings.restore; saveSettings(); openSettings(); }
+  else if (b.dataset.set === 'clear'){
+    if (!confirm('Clear cookies, storage and cache for all sites?')) return;
+    bridge.send('clear-data');
+    history = []; save('kb.history', history);
+    toast('Browsing data cleared');
+  }
+});
+$('#shade').addEventListener('click', e => { if (e.target === $('#shade')) $('#shade').classList.remove('open'); });
+function applyTheme(){
+  document.documentElement.dataset.theme = settings.theme;
+  bridge.send('set-theme', { dark: settings.theme === 'dark' });
+}
+
+/* ---------------------- permission prompts ---------------------- */
+const PERM_LABEL = {
+  media: 'use your camera or microphone',
+  geolocation: 'know your location',
+  notifications: 'show notifications',
+  midi: 'use MIDI devices', midiSysex: 'use MIDI devices',
+  'clipboard-read': 'read your clipboard',
+  'idle-detection': 'know when you are idle',
+  hid: 'access HID devices', serial: 'access serial ports', usb: 'access USB devices'
+};
+const permQueue = [];
+let permCur = null;
+function pumpPerm(){
+  if (permCur || !permQueue.length){ if (!permCur) $('#permbar').classList.remove('open'); return; }
+  permCur = permQueue.shift();
+  $('#permTxt').innerHTML = '<b>'+esc(permCur.origin.replace(/^https?:\/\//,''))+'</b> wants to '
+    + esc(PERM_LABEL[permCur.permission] || 'use “'+permCur.permission+'”');
+  $('#permRem').checked = false;
+  $('#permbar').classList.add('open');
+}
+function answerPerm(allow){
+  if (!permCur) return;
+  bridge.send('perm-response', { id: permCur.id, allow, remember: $('#permRem').checked,
+    origin: permCur.origin, permission: permCur.permission });
+  permCur = null; pumpPerm();
+}
+$('#permYes').onclick = () => answerPerm(true);
+$('#permNo').onclick = () => answerPerm(false);
+
+/* ---------------------- KONEKT side panel (docked app) ---------------------- */
+function kpanelToggle(force){
+  const kp = $('#kpanel');
+  const want = force !== undefined ? !!force : !kp.classList.contains('open');
+  kp.classList.toggle('open', want);
+  $('#sPanel').classList.toggle('on', want);
+  settings.kpanel = want; saveSettings();
+  if (want && !kpanelToggle._wv){
+    const wv = document.createElement('webview');
+    wv.setAttribute('partition', PARTITION);
+    wv.setAttribute('allowpopups', '');
+    wv.setAttribute('src', 'https://konekt-tawny.vercel.app');
+    $('#kpBody').appendChild(wv);
+    kpanelToggle._wv = wv;
+  }
+}
+
+/* ---------------------- ad & tracker blocker (UI side) ---------------------- */
+let adCount = 0;
+function renderShield(){
+  const b = $('#adBadge'); if (!b) return;
+  const on = settings.adblock !== false;
+  $('#sShield').style.opacity = on ? '' : '.45';
+  if (!on || !adCount){ b.style.display = 'none'; return; }
+  b.style.display = 'flex';
+  b.textContent = adCount > 999 ? '1k+' : String(adCount);
+}
+
+/* ---------------------- pop-out video (PiP) ---------------------- */
+function pipVideo(){
+  const t = AT();
+  if (!t || !t.wv || !t.ready){ toast('No video on this page'); return; }
+  const code = "(function(){var vs=[].slice.call(document.querySelectorAll('video'));" +
+    "if(document.pictureInPictureElement){document.exitPictureInPicture();return 'exit';}" +
+    "if(!vs.length)return 'none';var v=null;" +
+    "for(var i=0;i<vs.length;i++){if(!vs[i].paused){v=vs[i];break;}}" +
+    "if(!v){vs.sort(function(a,b){return b.clientWidth*b.clientHeight-a.clientWidth*a.clientHeight;});v=vs[0];}" +
+    "v.requestPictureInPicture();return 'ok';})()";
+  t.wv.executeJavaScript(code, true)
+    .then(r => { if (r === 'none') toast('No video on this page'); else if (r === 'exit') toast('Pop-out closed'); })
+    .catch(() => toast('Video pop-out failed'));
+}
+
+/* ---------------------- toasts ---------------------- */
+function toast(msg){
+  const el = document.createElement('div');
+  el.className = 'toast'; el.textContent = msg;
+  $('#toasts').appendChild(el);
+  setTimeout(() => el.remove(), 2600);
+}
+
+/* ---------------------- chords ---------------------- */
+function chord(c){
+  const t = AT();
+  switch (c){
+    case 'ctrl+t': newTab(START); break;
+    case 'ctrl+w': if (t) closeTab(t.id); break;
+    case 'ctrl+shift+t': reopenClosed(); break;
+    case 'ctrl+tab': cycle(1); break;
+    case 'ctrl+shift+tab': cycle(-1); break;
+    case 'ctrl+l': case 'f6': addr.focus(); break;
+    case 'ctrl+f': openFind(); break;
+    case 'ctrl+h': togglePanel('pHist'); break;
+    case 'ctrl+j': togglePanel('pDl'); break;
+    case 'ctrl+d': toggleBookmark(); break;
+    case 'ctrl+p': if (t && t.wv && t.ready) try { t.wv.print(); } catch {} break;
+    case 'ctrl+r': case 'f5': if (t && t.wv) try { t.wv.reload(); } catch {} break;
+    case 'ctrl+shift+r': if (t && t.wv) try { t.wv.reloadIgnoringCache(); } catch {} break;
+    case 'f11': bridge.send('win-fullscreen'); break;
+    case 'f12': if (t && t.wv && t.ready) try { t.wv.openDevTools(); } catch {} break;
+    case 'ctrl+0': if (t) setZoom(t, 1); break;
+    case 'ctrl+=': case 'ctrl+plus': zoomStep(1); break;
+    case 'ctrl+-': zoomStep(-1); break;
+    case 'alt+left': if (t && t.wv) try { t.wv.goBack(); } catch {} break;
+    case 'alt+right': if (t && t.wv) try { t.wv.goForward(); } catch {} break;
+    case 'escape':
+      if ($('#findbar').classList.contains('open')) closeFind();
+      else if ($('#menu').classList.contains('open')) $('#menu').classList.remove('open');
+      else if ($('#shade').classList.contains('open')) $('#shade').classList.remove('open');
+      else document.querySelectorAll('.panel.open').forEach(p => p.classList.remove('open'));
+      break;
+    default:
+      if (/^ctrl\+[1-9]$/.test(c)){
+        const n = +c.slice(5);
+        const target = n === 9 ? tabs[tabs.length - 1] : tabs[n - 1];
+        if (target) activate(target.id);
+      }
+  }
+}
+function cycle(d){
+  if (tabs.length < 2) return;
+  const i = tabs.findIndex(t => t.id === activeId);
+  activate(tabs[(i + d + tabs.length) % tabs.length].id);
+}
+document.addEventListener('keydown', e => {
+  const k = e.key.toLowerCase();
+  let c = '';
+  if (e.ctrlKey) c += 'ctrl+';
+  if (e.altKey) c += 'alt+';
+  if (e.shiftKey && (k === 'tab' || k === 'r' || k === 't')) c += 'shift+';
+  c += k === '+' ? 'plus' : k === 'arrowleft' ? 'left' : k === 'arrowright' ? 'right' : k;
+  const CH = new Set(['ctrl+t','ctrl+w','ctrl+shift+t','ctrl+tab','ctrl+shift+tab','ctrl+l','ctrl+f','ctrl+h',
+    'ctrl+j','ctrl+d','ctrl+p','ctrl+r','ctrl+shift+r','f5','f6','f11','f12','ctrl+0','ctrl+-','ctrl+=','ctrl+plus',
+    'ctrl+1','ctrl+2','ctrl+3','ctrl+4','ctrl+5','ctrl+6','ctrl+7','ctrl+8','ctrl+9','escape']);
+  const editing = /INPUT|TEXTAREA/.test(document.activeElement && document.activeElement.tagName || '');
+  if (c === 'escape' && editing && document.activeElement !== findQ){ return; }
+  if (!CH.has(c)) return;
+  if (editing && (c === 'ctrl+d')) {} // allow bookmark even while typing
+  e.preventDefault();
+  chord(c);
+});
+
+/* ---------------------- bridge events ---------------------- */
+bridge.on('open-url', (url, background) => {
+  if (url.startsWith('konekt-search:')) url = searchURL(url.slice('konekt-search:'.length));
+  newTab(url, !!background);
+});
+bridge.on('chord', chord);
+bridge.on('zoom-step', d => zoomStep(d));
+bridge.on('perm-request', req => { permQueue.push(req); pumpPerm(); });
+bridge.on('dl', ev => {
+  if (ev.state === 'data-cleared') return;
+  const cur = dls.get(ev.id) || {};
+  dls.set(ev.id, Object.assign({ ts: Date.now() }, cur, ev));
+  if (ev.state === 'started'){ toast('Downloading ' + ev.filename); }
+  if (ev.state === 'completed'){ toast('Downloaded ' + (dls.get(ev.id).filename || '')); }
+  renderDl();
+});
+bridge.on('fullscreen', on => document.body.classList.toggle('fs', on));
+bridge.on('adblock-count', n => { adCount = n; renderShield(); });
+
+/* ---------------------- start page clicks ---------------------- */
+$('#start').addEventListener('click', e => {
+  const del = e.target.closest('[data-deldial]');
+  if (del){ dials = dials.filter(d => d.u !== del.dataset.deldial); save('kb.dials', dials); renderStart(); return; }
+  if (e.target.closest('#dialForm') || e.target.closest('#stAdd')) return;
+  const go = e.target.closest('[data-go]');
+  if (go) navigate(AT(), go.dataset.go);
+});
+$('#start').addEventListener('auxclick', e => {
+  if (e.button !== 1) return;
+  const go = e.target.closest('[data-go]');
+  if (go) newTab(go.dataset.go, true);
+});
+
+/* ---------------------- session ---------------------- */
+let sessT = null;
+function persistSession(){
+  clearTimeout(sessT);
+  sessT = setTimeout(() => {
+    save('kb.session', { urls: tabs.map(t => t.url), active: tabs.findIndex(t => t.id === activeId) });
+  }, 250);
+}
+
+/* ---------------------- boot ---------------------- */
+$('#capLogo').innerHTML = logoShort(19);
+$('#ntb').innerHTML = ic('plus',14);
+$('#bBack').innerHTML = ic('back',15);
+$('#bFwd').innerHTML = ic('fwd',15);
+$('#bRel').innerHTML = ic('reload',15);
+$('#bDl').innerHTML = ic('dl',16);
+$('#bMenu').innerHTML = ic('dots',17);
+/* sidebar */
+$('#sHome').innerHTML = ic('home',16);
+$('#sPanel').innerHTML = globe(16, 9);
+$('#sBm').innerHTML = ic('star',16);
+$('#sHist').innerHTML = ic('hist',16);
+$('#sDlB').innerHTML = ic('dl',16);
+$('#sShield').innerHTML = ic('shield',16) + '<span class="sbadge" id="adBadge" style="display:none"></span>';
+$('#sSet').innerHTML = ic('gear',15);
+$('#kpLogo').innerHTML = logoShort(15);
+$('#kpOpen').innerHTML = ic('out',12);
+$('#sHome').onclick = () => navigate(AT(), START);
+$('#sPanel').onclick = () => kpanelToggle();
+$('#sBm').onclick = () => togglePanel('pBm');
+$('#sHist').onclick = () => togglePanel('pHist');
+$('#sDlB').onclick = () => togglePanel('pDl');
+$('#sShield').onclick = () => openSettings();
+$('#sSet').onclick = () => openSettings();
+$('#kpOpen').onclick = () => {
+  let u = 'https://konekt-tawny.vercel.app';
+  try { if (kpanelToggle._wv) u = kpanelToggle._wv.getURL() || u; } catch {}
+  newTab(u);
+};
+$('#kpX').onclick = () => kpanelToggle(false);
+applyTheme();
+bridge.send('adblock-set', { on: settings.adblock !== false });
+renderShield();
+if (settings.kpanel) kpanelToggle(true);
+
+const sess = load('kb.session', null);
+if (settings.restore && sess && Array.isArray(sess.urls) && sess.urls.length){
+  sess.urls.forEach((u, i) => newTab(u || START, i !== (sess.active >= 0 ? sess.active : 0)));
+  const act = tabs[sess.active >= 0 && sess.active < tabs.length ? sess.active : 0];
+  if (act) activate(act.id);
+} else {
+  newTab(START);
+}
+bridge.send('chrome-ready');
+
+/* ---------------------- smoke hooks ---------------------- */
+window.KB = {
+  newTab,
+  adblockState(){ return { on: settings.adblock !== false, blocked: adCount }; },
+  smokeNav(url){ navigate(AT(), url); },
+  smokeState(){
+    const t = AT();
+    return t ? { url: t.url, loading: t.loading, title: t.title, err: t.err } : {};
+  }
+};
+</script>
+</body>
+</html>

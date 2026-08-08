@@ -1,0 +1,15 @@
+{
+  "name": "konekt-browser",
+  "productName": "KONEKT Browser",
+  "version": "1.0.0",
+  "description": "KONEKT Browser — NKO Intl. Foundation of Technological Research & Development",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "smoke": "electron . --smoke"
+  },
+  "devDependencies": {
+    "electron": "^37.0.0",
+    "rcedit": "^5.0.2"
+  }
+}
