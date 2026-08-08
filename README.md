@@ -3,6 +3,9 @@
 A real web browser in the KONEKT design language — black, cubic, Montserrat.
 NKO Intl. Foundation of Technological Research & Development.
 
+**Download for Windows:** <https://konekt-browser.vercel.app> ·
+[Releases](https://github.com/vapesnuseu-cmyk/konekt-browser/releases)
+
 Chromium does the rendering (via Electron), so every site works exactly as it
 does in Chrome. The chrome around it is one file, KONEKT-style: `browser.html`.
 

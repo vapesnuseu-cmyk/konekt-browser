@@ -4,3 +4,5 @@ dist/
 PLAN.md
 PROGRESS.md
 .claude/
+.vercel
+.env*
