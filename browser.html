@@ -335,6 +335,44 @@ webview.wv.htmlfs{position:fixed;inset:0;z-index:120;visibility:visible}
 .dw-pad{flex:1}
 .dw-foot{padding:12px 16px;border-top:1px solid var(--line-3);font-size:10px;color:var(--dim-2)}
 
+/* ---------------- command palette (Ctrl+K) ---------------- */
+.cmdk-shade{position:absolute;inset:0;background:rgba(0,0,0,.5);z-index:110;display:flex;align-items:flex-start;justify-content:center;padding:11vh 20px}
+:root[data-theme="light"] .cmdk-shade{background:rgba(0,0,0,.3)}
+.cmdk{width:min(640px,100%);background:var(--bg);border:1px solid var(--line);display:flex;flex-direction:column;max-height:72vh;box-shadow:0 20px 60px rgba(0,0,0,.55)}
+[data-appearance="glass"] .cmdk{background:var(--glass-bg);-webkit-backdrop-filter:blur(var(--glass-blur)) saturate(1.6);backdrop-filter:blur(var(--glass-blur)) saturate(1.6)}
+.cmdk-in{display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--line-3);flex:0 0 auto}
+.cmdk-i{color:var(--dim);display:flex}
+#cmdkIn{flex:1;background:none;border:0;outline:0;color:var(--text);font-size:15px;font-weight:500;font-family:var(--font)}
+#cmdkIn::placeholder{color:var(--dim-2)}
+.cmdk-list{overflow-y:auto}
+.cmdk-row{display:flex;align-items:center;gap:12px;padding:9px 16px;cursor:default;min-width:0}
+.cmdk-row.hot{background:var(--hover-2)}
+.cmdk-k{flex:0 0 auto;font-size:8px;text-transform:uppercase;letter-spacing:.1em;color:var(--dim-2);font-weight:700;width:60px}
+.cmdk-row.hot .cmdk-k{color:var(--accent)}
+.cmdk-t{flex:0 1 auto;font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cmdk-s{flex:1 1 auto;font-size:11px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:right}
+.cmdk-empty{padding:30px;text-align:center;color:var(--dim-2);font-size:13px}
+
+/* ---------------- bookmarks bar ---------------- */
+#bmbar{display:none;align-items:center;gap:2px;height:32px;padding:0 8px;overflow-x:auto;flex:0 0 auto;
+  border-bottom:1px solid var(--line-3);background:var(--bg);scrollbar-width:none}
+#bmbar::-webkit-scrollbar{display:none}
+body.bmbar-on #bmbar{display:flex}
+.bmb{display:inline-flex;align-items:center;gap:7px;flex:0 0 auto;padding:5px 10px;font-size:11.5px;font-weight:600;
+  color:var(--text-2);max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:default}
+.bmb:hover{background:var(--hover-2);color:var(--text)}
+.bmb .bmb-f{flex:0 0 auto;width:14px;height:14px;display:flex;align-items:center;justify-content:center;font-size:8.5px;font-weight:800;color:var(--dim)}
+.bmb .bmb-f img{width:14px;height:14px;object-fit:contain}
+#bmbar .bmb-empty{color:var(--dim-2);font-size:11px;padding:0 8px}
+
+/* ---------------- tab context menu ---------------- */
+.ctxmenu{position:fixed;z-index:130;min-width:186px;background:var(--bg);border:1px solid var(--line);padding:5px 0;box-shadow:0 10px 34px rgba(0,0,0,.5)}
+[data-appearance="glass"] .ctxmenu{background:var(--glass-bg);-webkit-backdrop-filter:blur(var(--glass-blur));backdrop-filter:blur(var(--glass-blur))}
+.ctx-row{display:block;width:100%;text-align:left;padding:8px 15px;font-size:12.5px;font-weight:600;color:var(--text-2)}
+.ctx-row:hover{background:var(--hover);color:var(--text)}
+.ctx-row.dis{opacity:.38;pointer-events:none}
+.ctx-sep{height:1px;background:var(--line-3);margin:5px 0}
+
 /* ---------------- error overlay ---------------- */
 #errov{position:absolute;inset:0;display:none;align-items:center;justify-content:center;background:var(--bg);z-index:5}
 #errov.on{display:flex}
@@ -634,6 +672,7 @@ body{background-color:var(--bg);background-image:var(--wall,none);background-siz
   <button class="nbtn" id="bMenu" title="Menu"></button>
 </div>
 <div id="prog"><i></i></div>
+<div id="bmbar"></div>
 
 <div id="permbar">
   <span id="permTxt"></span>
@@ -802,7 +841,7 @@ function load(k, d){ try { const v = JSON.parse(localStorage.getItem(k)); return
 function save(k, v){ try { localStorage.setItem(k, JSON.stringify(v)); } catch {} if (window.kbOnSave) window.kbOnSave(k); }
 
 const settings = Object.assign({
-  engine:'google', theme:'dark', restore:true, homepage:'', adblock:true, kpanel:false,
+  engine:'google', theme:'dark', restore:true, homepage:'', adblock:true, kpanel:false, bmbar:false,
   /* appearance — mirrors KONEKT's own settings, browser-applicable subset */
   mode:'dark',          // dark | light | system | glass | custom
   accent:'#1d9bf0',
@@ -1534,8 +1573,28 @@ function toggleBookmark(){
   if (i >= 0){ bookmarks.splice(i, 1); toast('Bookmark removed'); }
   else { bookmarks.unshift({ u:t.url, t:t.title || t.url, ts:Date.now() }); toast('Bookmarked'); }
   save('kb.bookmarks', bookmarks);
-  renderOmni(); renderBm();
+  renderOmni(); renderBm(); renderBmBar();
 }
+/* ---- bookmarks bar ---- */
+function renderBmBar(){
+  const bar = $('#bmbar'); if (!bar) return;
+  if (!bookmarks.length){ bar.innerHTML = '<span class="bmb-empty">No bookmarks yet — press Ctrl+D on a page</span>'; return; }
+  bar.innerHTML = bookmarks.slice(0, 40).map(b => '<button class="bmb" data-go="'+esc(b.u)+'" data-bmu="'+esc(b.u)+'" title="'+esc(b.u)+'">'
+    + '<span class="bmb-f">'+(b.fav ? '<img src="'+esc(b.fav)+'" onerror="this.remove()">' : esc((hostOf(b.u)[0]||'·').toUpperCase()))+'</span>'
+    + esc(b.t || hostOf(b.u) || b.u)+'</button>').join('');
+}
+function toggleBookmarksBar(){
+  settings.bmbar = !settings.bmbar;
+  document.body.classList.toggle('bmbar-on', settings.bmbar);
+  saveSettings(); if (settings.bmbar) renderBmBar();
+  toast(settings.bmbar ? 'Bookmarks bar on' : 'Bookmarks bar off');
+}
+$('#bmbar').addEventListener('click', e => { const b = e.target.closest('[data-go]'); if (b) navigate(AT(), b.dataset.go); });
+$('#bmbar').addEventListener('auxclick', e => { if (e.button !== 1) return; const b = e.target.closest('[data-go]'); if (b){ e.preventDefault(); newTab(b.dataset.go, true); } });
+$('#bmbar').addEventListener('contextmenu', e => {
+  const b = e.target.closest('[data-bmu]'); if (!b) return; e.preventDefault();
+  if (confirm('Remove this bookmark?')){ bookmarks = bookmarks.filter(x => x.u !== b.dataset.bmu); save('kb.bookmarks', bookmarks); renderBmBar(); renderOmni(); }
+});
 
 /* ---------------------- tab strip events ---------------------- */
 let dragId = null;
@@ -1552,6 +1611,35 @@ $('#tabs').addEventListener('auxclick', e => {
   const el = e.target.closest('[data-tab]');
   if (el) closeTab(+el.dataset.tab);
 });
+$('#tabs').addEventListener('contextmenu', e => {
+  const el = e.target.closest('[data-tab]'); if (!el) return; e.preventDefault();
+  const t = T(+el.dataset.tab); if (t) openTabMenu(e.clientX, e.clientY, t);
+});
+function closeTabMenu(){ const m = $('#tabmenu'); if (m) m.remove(); }
+function openTabMenu(x, y, t){
+  closeTabMenu();
+  const idx = tabs.findIndex(tb => tb.id === t.id), last = tabs.length - 1;
+  const rows = [
+    { l:'New tab', fn:()=>newTab(START) },
+    { l:'Duplicate tab', fn:()=>{ if (t.url && t.url !== START) newTab(t.url); else newTab(START); } },
+    { l:'Reload', fn:()=>{ if (t.wv) try { t.wv.reload(); } catch {} } },
+    { l:(t.muted?'Unmute tab':'Mute tab'), fn:()=>{ if (t.wv){ t.muted = !t.muted; try { t.wv.setAudioMuted(t.muted); } catch {} renderTabs(); } } },
+    'sep',
+    { l:'Close tab', fn:()=>closeTab(t.id) },
+    { l:'Close other tabs', dis:tabs.length<2, fn:()=>{ tabs.filter(tb=>tb.id!==t.id).map(tb=>tb.id).forEach(closeTab); } },
+    { l:'Close tabs to the right', dis:idx>=last, fn:()=>{ tabs.slice(idx+1).map(tb=>tb.id).forEach(closeTab); } }
+  ];
+  const m = document.createElement('div'); m.id = 'tabmenu'; m.className = 'ctxmenu';
+  m.innerHTML = rows.map((r,i)=> r==='sep' ? '<div class="ctx-sep"></div>'
+    : '<button class="ctx-row'+(r.dis?' dis':'')+'" data-ci="'+i+'">'+esc(r.l)+'</button>').join('');
+  document.body.appendChild(m);
+  m.style.left = Math.min(x, window.innerWidth - m.offsetWidth - 6) + 'px';
+  m.style.top = Math.min(y, window.innerHeight - m.offsetHeight - 6) + 'px';
+  m.addEventListener('click', e => { const b = e.target.closest('[data-ci]'); if (!b) return; const r = rows[+b.dataset.ci];
+    if (r && r !== 'sep' && !r.dis){ closeTabMenu(); r.fn(); } });
+}
+document.addEventListener('click', closeTabMenu);
+window.addEventListener('blur', closeTabMenu);
 $('#tabs').addEventListener('dragstart', e => {
   const el = e.target.closest('[data-tab]');
   if (!el){ e.preventDefault(); return; }
@@ -1876,6 +1964,72 @@ $('#drawer').addEventListener('click', e => {
 });
 $('#drawerShade').addEventListener('click', closeDrawer);
 
+/* ---- command palette (Ctrl+K) ---- */
+function openCmdK(){
+  if ($('#cmdk')) return;
+  const ov = document.createElement('div'); ov.id = 'cmdk'; ov.className = 'cmdk-shade';
+  ov.innerHTML = '<div class="cmdk"><div class="cmdk-in"><span class="cmdk-i"></span>'
+    + '<input id="cmdkIn" placeholder="Search tabs, bookmarks, history — or a command…" spellcheck="false" autocomplete="off"></div>'
+    + '<div class="cmdk-list" id="cmdkList"></div></div>';
+  $('#main').appendChild(ov);
+  ov.querySelector('.cmdk-i').innerHTML = ic('search', 15);
+  const input = $('#cmdkIn'), list = $('#cmdkList');
+  let items = [], hot = 0;
+  const COMMANDS = [
+    { t:'New tab', s:'Ctrl+T', run:()=>newTab(START) },
+    { t:'Reopen closed tab', s:'Ctrl+Shift+T', run:reopenClosed },
+    { t:'Speed Dial / HUD', run:()=>navigate(AT(), START) },
+    { t:'Bookmark this page', s:'Ctrl+D', run:toggleBookmark },
+    { t:'Add to reading list', run:addReadingList },
+    { t:'Reading list', run:openReadingList },
+    { t:'Bookmarks', run:()=>togglePanel('pBm') },
+    { t:'History', s:'Ctrl+H', run:()=>togglePanel('pHist') },
+    { t:'Downloads', s:'Ctrl+J', run:()=>togglePanel('pDl') },
+    { t:'Capture screenshot', run:screenshotPage },
+    { t:'Translate page', run:translatePage },
+    { t:'Copy link', run:copyLink },
+    { t:'Find in page', s:'Ctrl+F', run:openFind },
+    { t:'Pop out video', run:pipVideo },
+    { t:'KONEKT panel', run:()=>kpanelToggle() },
+    { t:'Toggle bookmarks bar', s:'Ctrl+Shift+B', run:toggleBookmarksBar },
+    { t:'Settings', run:openSettings },
+    { t:'Account', run:openAccount },
+    { t:'Check for updates', run:()=>{ openSettings(); setTimeout(checkUpdates, 200); } }
+  ];
+  function build(q){
+    q = q.trim().toLowerCase(); const out = [];
+    if (q) out.push({ kind:'Open', t:input.value, sub:'Search or go to', run:()=>navigate(AT(), input.value) });
+    tabs.forEach(tb => { const label = tb.title || 'New tab', u = tb.url || '';
+      if (!q || label.toLowerCase().includes(q) || u.toLowerCase().includes(q))
+        out.push({ kind:'Tab', t:label, sub:(u===START?'Speed Dial':u), run:()=>activate(tb.id) }); });
+    COMMANDS.forEach(c => { if (!q || c.t.toLowerCase().includes(q)) out.push({ kind:'Command', t:c.t, sub:c.s||'', run:c.run }); });
+    if (q){ bookmarks.forEach(b => { if ((b.t||'').toLowerCase().includes(q) || (b.u||'').toLowerCase().includes(q))
+        out.push({ kind:'Bookmark', t:b.t||b.u, sub:b.u, run:()=>navigate(AT(), b.u) }); }); }
+    if (q){ const seen = new Set();
+      for (let i = history.length-1; i>=0 && out.length<45; i--){ const h = history[i]; if (seen.has(h.u)) continue;
+        if ((h.t||'').toLowerCase().includes(q) || h.u.toLowerCase().includes(q)){ seen.add(h.u); out.push({ kind:'History', t:h.t||h.u, sub:h.u, run:()=>navigate(AT(), h.u) }); } } }
+    items = out.slice(0, 45); hot = 0; paint();
+  }
+  function paint(){
+    list.innerHTML = items.map((it,i)=>'<div class="cmdk-row'+(i===hot?' hot':'')+'" data-i="'+i+'">'
+      + '<span class="cmdk-k">'+esc(it.kind)+'</span><span class="cmdk-t">'+esc(it.t)+'</span><span class="cmdk-s">'+esc(it.sub||'')+'</span></div>').join('')
+      || '<div class="cmdk-empty">No matches</div>';
+    const h = list.querySelector('.hot'); if (h) h.scrollIntoView({ block:'nearest' });
+  }
+  function run(i){ const it = items[i]; if (!it) return; close(); try { it.run(); } catch {} }
+  function close(){ ov.remove(); }
+  input.addEventListener('input', () => build(input.value));
+  input.addEventListener('keydown', e => {
+    if (e.key === 'ArrowDown'){ e.preventDefault(); hot = Math.min(items.length-1, hot+1); paint(); }
+    else if (e.key === 'ArrowUp'){ e.preventDefault(); hot = Math.max(0, hot-1); paint(); }
+    else if (e.key === 'Enter'){ e.preventDefault(); run(hot); }
+    else if (e.key === 'Escape'){ close(); }
+  });
+  list.addEventListener('click', e => { const r = e.target.closest('[data-i]'); if (r) run(+r.dataset.i); });
+  ov.addEventListener('mousedown', e => { if (e.target === ov) close(); });
+  build(''); input.focus();
+}
+
 /* ---------------------- settings ---------------------- */
 function colorRow(title, key, fallback){
   const v = settings[key] || fallback;
@@ -1942,6 +2096,7 @@ async function openSettings(){
     + '<button class="set-row" data-set="resetapp">Reset appearance<span class="sr" style="color:var(--danger)">Reset</span></button>'
     + '<div class="set-h">On start</div>'
     + '<button class="set-row" data-set="restore">Reopen previous tabs<span class="sr">'+(settings.restore ? 'On' : 'Off')+'</span></button>'
+    + '<button class="set-row" data-set="bmbar">Bookmarks bar<span class="sr">'+(settings.bmbar ? 'On' : 'Off')+'</span></button>'
     + '<div class="set-h">Privacy</div>'
     + '<button class="set-row" data-set="adblock">Ad &amp; tracker blocker<span class="sr">'+(settings.adblock !== false ? 'On' : 'Off')+'</span></button>'
     + '<button class="set-row" data-set="clear"><span class="set-danger">Clear browsing data</span></button>'
@@ -2004,6 +2159,7 @@ $('#setBody').addEventListener('click', e => {
     renderShield(); openSettings();
   }
   else if (b.dataset.set === 'restore'){ settings.restore = !settings.restore; saveSettings(); openSettings(); }
+  else if (b.dataset.set === 'bmbar'){ toggleBookmarksBar(); openSettings(); }
   else if (b.dataset.set === 'clear'){
     if (!confirm('Clear cookies, storage and cache for all sites?')) return;
     bridge.send('clear-data');
@@ -2189,6 +2345,8 @@ function chord(c){
     case 'ctrl+h': togglePanel('pHist'); break;
     case 'ctrl+j': togglePanel('pDl'); break;
     case 'ctrl+d': toggleBookmark(); break;
+    case 'ctrl+k': openCmdK(); break;
+    case 'ctrl+shift+b': toggleBookmarksBar(); break;
     case 'ctrl+p': if (t && t.wv && t.ready) try { t.wv.print(); } catch {} break;
     case 'ctrl+r': case 'f5': if (t && t.wv) try { t.wv.reload(); } catch {} break;
     case 'ctrl+shift+r': if (t && t.wv) try { t.wv.reloadIgnoringCache(); } catch {} break;
@@ -2200,7 +2358,8 @@ function chord(c){
     case 'alt+left': if (t && t.wv) try { t.wv.goBack(); } catch {} break;
     case 'alt+right': if (t && t.wv) try { t.wv.goForward(); } catch {} break;
     case 'escape':
-      if ($('#findbar').classList.contains('open')) closeFind();
+      if ($('#cmdk')) $('#cmdk').remove();
+      else if ($('#findbar').classList.contains('open')) closeFind();
       else if ($('#drawer').classList.contains('open')) closeDrawer();
       else if ($('#menu').classList.contains('open')) $('#menu').classList.remove('open');
       else if ($('#acctShade').classList.contains('open')) closeAccount();
@@ -2225,10 +2384,10 @@ document.addEventListener('keydown', e => {
   let c = '';
   if (e.ctrlKey) c += 'ctrl+';
   if (e.altKey) c += 'alt+';
-  if (e.shiftKey && (k === 'tab' || k === 'r' || k === 't')) c += 'shift+';
+  if (e.shiftKey && (k === 'tab' || k === 'r' || k === 't' || k === 'b')) c += 'shift+';
   c += k === '+' ? 'plus' : k === 'arrowleft' ? 'left' : k === 'arrowright' ? 'right' : k;
   const CH = new Set(['ctrl+t','ctrl+w','ctrl+shift+t','ctrl+tab','ctrl+shift+tab','ctrl+l','ctrl+f','ctrl+h',
-    'ctrl+j','ctrl+d','ctrl+p','ctrl+r','ctrl+shift+r','f5','f6','f11','f12','ctrl+0','ctrl+-','ctrl+=','ctrl+plus',
+    'ctrl+j','ctrl+d','ctrl+k','ctrl+shift+b','ctrl+p','ctrl+r','ctrl+shift+r','f5','f6','f11','f12','ctrl+0','ctrl+-','ctrl+=','ctrl+plus',
     'ctrl+1','ctrl+2','ctrl+3','ctrl+4','ctrl+5','ctrl+6','ctrl+7','ctrl+8','ctrl+9','escape']);
   const editing = /INPUT|TEXTAREA/.test(document.activeElement && document.activeElement.tagName || '');
   if (c === 'escape' && editing && document.activeElement !== findQ){ return; }
@@ -2390,6 +2549,7 @@ async function pullSync(){
     mergeIn(j.data);
     syncVer = j.ver || 0; save('kb.syncver', syncVer);
     applyTheme(); renderStart(); renderOmni(); renderBm();
+    document.body.classList.toggle('bmbar-on', !!settings.bmbar); renderBmBar();
     bridge.send('adblock-set', { on: settings.adblock !== false });
     setSyncLine('Synced');
   } catch (e) { setSyncLine('Sync failed — ' + e.message); }
@@ -2575,6 +2735,7 @@ $('#kpOpen').onclick = () => {
 };
 $('#kpX').onclick = () => kpanelToggle(false);
 applyTheme();
+document.body.classList.toggle('bmbar-on', !!settings.bmbar); renderBmBar();
 bridge.send('adblock-set', { on: settings.adblock !== false });
 renderShield();
 if (settings.kpanel) kpanelToggle(true);
@@ -2599,6 +2760,9 @@ window.KB = {
   smokeCustom(){ Object.assign(settings, { mode:'custom', bgCol:'#0d1b2a', lineCol:'#2a4a6b', textCol:'#eaf2ff', accent:'#00ba7c', radius:12, wallpaper:'', fs:'m' }); applyTheme(); navigate(AT(), START); },
   smokeGeek(){ settings.mode = 'geek'; applyTheme(); navigate(AT(), START); },
   smokeEdit(){ settings.mode = 'dark'; applyTheme(); hudEdit = true; settings.hudStyle = { weather:'accent', news:'glass', markets:'accent' }; navigate(AT(), START); },
+  smokeCmdK(){ settings.mode = 'dark'; applyTheme(); hudEdit = false; settings.bmbar = true; document.body.classList.add('bmbar-on');
+    bookmarks = [{u:'https://konekt.network',t:'KONEKT'},{u:'https://github.com',t:'GitHub'},{u:'https://news.ycombinator.com',t:'Hacker News'}]; renderBmBar();
+    openCmdK(); const i = $('#cmdkIn'); if (i){ i.value = 'kon'; i.dispatchEvent(new Event('input')); } },
   smokeSettingsAppearance(){ openSettings(); },
   smokeAccount(){ openAccount(); },
   smokeSettings(){ openSettings(); },

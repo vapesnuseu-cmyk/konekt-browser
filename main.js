@@ -226,9 +226,6 @@ function createWindow() {
     if (cmd === 'browser-forward') send('chord', 'alt+right');
   });
 
-  win.webContents.on('console-message', (_e, level, message, line, src) => {
-    if (level >= 2) console.log('RENDERER[' + level + '] ' + message + ' @' + (src || '') + ':' + line);
-  });
   win.loadFile('browser.html');
 }
 
@@ -471,6 +468,13 @@ async function runSmoke() {
     fs.writeFileSync(path.join(smokeDir, 'smoke-editboard.png'),
       (await win.webContents.capturePage()).toPNG());
     await win.webContents.executeJavaScript('hudEdit=false,settings.hudStyle={},renderStart(),undefined');
+
+    /* command palette (Ctrl+K) + bookmarks bar */
+    await win.webContents.executeJavaScript('KB.smokeCmdK(), undefined');
+    await delay(700);
+    fs.writeFileSync(path.join(smokeDir, 'smoke-cmdk.png'),
+      (await win.webContents.capturePage()).toPNG());
+    await win.webContents.executeJavaScript('($("#cmdk")&&$("#cmdk").remove()), undefined');
 
     /* account modal (sign in / create) */
     await win.webContents.executeJavaScript('kpanelToggle(false), KB.smokeAccount(), undefined');

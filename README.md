@@ -58,6 +58,20 @@ The browser now mirrors KONEKT's own appearance settings:
 - **Left slide-out menu** on desktop, plus reading list, screenshot, translate
   and copy-link. Sync merges per-key, so a phone push never clobbers desktop HUD.
 
+### New in 1.4
+
+- **Command palette** (Ctrl+K) — fuzzy search across open tabs, bookmarks,
+  history and commands; arrow-key navigate, Enter to act.
+- **Bookmarks bar** — optional strip under the toolbar (Settings, or Ctrl+Shift+B);
+  middle-click opens in a new tab, right-click removes.
+- **Tab right-click menu** — duplicate, reload, mute, close, close others,
+  close to the right.
+- **Fully free pinboard** — the HUD board spans the full width on an 8-column
+  grid (no forced centre); **± SIZE** scales every pin, each pin has its own
+  resize handle, and the droplet button cycles a per-widget look
+  (Default / Glass / Solid / Clear / Accent). Layout, styles and scale sync.
+- Fixed a 1.3.0 regression where the slide-out drawer hid the left icon rail.
+
 ## Run it
 
 Double-click **`KONEKT Browser.cmd`** — or from a terminal:
