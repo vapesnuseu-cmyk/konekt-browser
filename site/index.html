@@ -4,9 +4,9 @@
 <meta charset="utf-8">
 <title>KONEKT Browser — download</title>
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="description" content="KONEKT Browser — a Chromium browser in the KONEKT design language. Sidebar, Speed Dial, docked KONEKT panel, built-in ad blocker. Free download for Windows.">
+<meta name="description" content="KONEKT Browser — a browser in the KONEKT design language. Sidebar, Speed Dial, docked KONEKT panel, built-in ad blocker. Free download for Windows and Android.">
 <meta property="og:title" content="KONEKT Browser">
-<meta property="og:description" content="The web, in the KONEKT design language. Free download for Windows.">
+<meta property="og:description" content="The web, in the KONEKT design language. Free download for Windows and Android.">
 <meta property="og:image" content="/shot-start.png">
 <link rel="icon" type="image/png" href="/icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -46,10 +46,12 @@ header{border-bottom:1px solid var(--line-3)}
   font-weight:700;color:var(--text-2);margin:10px 0 26px}
 .hero p{max-width:560px;margin:0 auto 38px;color:var(--dim);font-size:16px}
 .cta{display:inline-flex;flex-direction:column;align-items:center;gap:12px}
-.dl-btn{display:inline-flex;align-items:center;gap:12px;background:var(--text);color:var(--bg);
+.dl-row{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+.dl-btn{display:inline-flex;align-items:center;gap:11px;background:var(--text);color:var(--bg);
   font-weight:800;font-size:14px;text-transform:uppercase;letter-spacing:.1em;
-  padding:17px 38px;text-decoration:none;border:1px solid var(--text)}
-.dl-btn:hover{background:var(--btn-h);border-color:var(--btn-h)}
+  padding:16px 34px;text-decoration:none;border:1px solid var(--text)}
+.dl-btn:nth-child(2){background:var(--bg);color:var(--text)}
+.dl-btn:hover{background:var(--btn-h);border-color:var(--btn-h);color:var(--bg)}
 .dl-btn svg{flex:0 0 auto}
 .cta .meta{font-size:11.5px;color:var(--dim)}
 .cta .warn{font-size:11px;color:var(--dim-2)}
@@ -121,15 +123,20 @@ footer{margin-top:88px;border-top:1px solid var(--line-3);padding:30px 0 44px}
 <div class="hero">
   <span class="lg"><span>K</span><svg viewBox="-56 -56 112 112" style="width:.78em;height:.78em" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="7.4"><circle r="50"/><ellipse rx="18" ry="50"/><ellipse rx="36.5" ry="50"/><line y1="-50" y2="50"/><line x1="-48.7" y1="0" x2="48.7" y2="0"/><line x1="-43.6" y1="21.5" x2="43.6" y2="21.5"/><line x1="-43.6" y1="-21.5" x2="43.6" y2="-21.5"/><line x1="-31" y1="38" x2="31" y2="38"/><line x1="-31" y1="-38" x2="31" y2="-38"/></g></svg><span>NEKT</span></span>
   <div class="sub">Browser</div>
-  <p>The web, in the KONEKT design language. Chromium underneath, a sidebar-first
-  black-and-white chrome on top, ads blocked out of the box — and the whole KONEKT
-  network docked one icon away.</p>
+  <p>The web, in the KONEKT design language. A sidebar-first black-and-white chrome,
+  ads blocked out of the box, the whole KONEKT network docked one icon away —
+  on the desktop and in your pocket.</p>
   <div class="cta">
-    <a class="dl-btn" href="https://github.com/vapesnuseu-cmyk/konekt-browser/releases/latest/download/KONEKT-Browser-win-x64.zip">
-      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0 5-5m-5 5-5-5M4 20h16"/></svg>
-      Download for Windows</a>
-    <span class="meta">v1.0.0 · portable — no installer · ≈128&nbsp;MB · Windows 10/11 x64</span>
-    <span class="warn">Unsigned build — SmartScreen will warn on first run. <a href="#install">Install steps</a></span>
+    <div class="dl-row">
+      <a class="dl-btn" href="https://github.com/vapesnuseu-cmyk/konekt-browser/releases/latest/download/KONEKT-Browser-win-x64.zip">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6l7-1v6H4zM11 5l9-1v8h-9zM4 12h7v6l-7-1zM11 12h9v8l-9-1z"/></svg>
+        Windows</a>
+      <a class="dl-btn" href="https://github.com/vapesnuseu-cmyk/konekt-browser/releases/latest/download/KONEKT-Browser-android.apk">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="3" width="12" height="18" rx="2"/><line x1="10" y1="18.5" x2="14" y2="18.5"/></svg>
+        Android</a>
+    </div>
+    <span class="meta">v1.0.0 · Windows portable ≈128&nbsp;MB · Android APK ≈60&nbsp;KB (Android 7+)</span>
+    <span class="warn">Unsigned builds — a security prompt appears on first run. <a href="#install">Install steps</a></span>
   </div>
   <img class="shot" src="/shot-start.png" alt="KONEKT Browser — Speed Dial start page with the icon sidebar" width="1600" height="1064">
 </div>
@@ -195,7 +202,7 @@ footer{margin-top:88px;border-top:1px solid var(--line-3);padding:30px 0 44px}
 </section>
 
 <section id="install">
-  <h2 class="sec-h">Install</h2>
+  <h2 class="sec-h">Install · Windows</h2>
   <div class="steps">
     <div class="step"><div><b>Download the zip</b><br><span class="d">KONEKT-Browser-win-x64.zip, ≈128 MB, hosted on GitHub Releases.</span></div></div>
     <div class="step"><div><b>Unzip anywhere</b><br><span class="d">Documents, Desktop, a USB stick — the folder is the whole install; no admin rights needed.</span></div></div>
@@ -205,7 +212,21 @@ footer{margin-top:88px;border-top:1px solid var(--line-3);padding:30px 0 44px}
     so SmartScreen warns on first run. Click <b>More info → Run anyway</b>. Verify the download
     against the checksum below if you want certainty about what you're running.</div>
   <div class="hash"><span class="h-label">SHA-256 · KONEKT-Browser-win-x64.zip</span>F5BAAC12D8788A3342D0BBBE1AF2CBCD5FC8F1557EC4ED364FBDDD900FA7E724</div>
-  <p class="req">Requires 64-bit Windows 10 or 11. Source, issues and releases: <a href="https://github.com/vapesnuseu-cmyk/konekt-browser">github.com/vapesnuseu-cmyk/konekt-browser</a></p>
+  <p class="req">Requires 64-bit Windows 10 or 11.</p>
+</section>
+
+<section>
+  <h2 class="sec-h">Install · Android</h2>
+  <div class="steps">
+    <div class="step"><div><b>Download the APK</b><br><span class="d">Open this page on your phone and tap Android above, or move KONEKT-Browser-android.apk across — it's only ≈60 KB.</span></div></div>
+    <div class="step"><div><b>Allow the install</b><br><span class="d">Tap the downloaded file. If Android asks, allow your browser or Files app to “install unknown apps” — a one-time per-app switch.</span></div></div>
+    <div class="step"><div><b>Open KONEKT Browser</b><br><span class="d">It appears in your app drawer with the KONEKT icon, and registers as a browser you can set as default.</span></div></div>
+  </div>
+  <div class="note"><b>“Unknown app” / Play Protect prompt?</b> Expected — the APK is self-signed and
+    not distributed through Play. Tap <b>More details → Install anyway</b> (or enable installs for your
+    file manager). Match the checksum below to be sure the file is intact.</div>
+  <div class="hash"><span class="h-label">SHA-256 · KONEKT-Browser-android.apk</span>4269AB9C478DCBD4D07E785F1F192D6D566863C5822F30EF206F7FEACB22636B</div>
+  <p class="req">Requires Android 7.0 (API 24) or newer, using the system Android WebView. Source, issues and releases: <a href="https://github.com/vapesnuseu-cmyk/konekt-browser">github.com/vapesnuseu-cmyk/konekt-browser</a></p>
 </section>
 
 </div>

@@ -4,5 +4,7 @@ dist/
 PLAN.md
 PROGRESS.md
 .claude/
+android/build/
+android/keystore/
 .vercel
 .env*

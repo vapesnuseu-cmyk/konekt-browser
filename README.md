@@ -3,11 +3,17 @@
 A real web browser in the KONEKT design language — black, cubic, Montserrat.
 NKO Intl. Foundation of Technological Research & Development.
 
-**Download for Windows:** <https://konekt-browser.vercel.app> ·
+**Download (Windows &amp; Android):** <https://konekt-browser.vercel.app> ·
 [Releases](https://github.com/vapesnuseu-cmyk/konekt-browser/releases)
 
-Chromium does the rendering (via Electron), so every site works exactly as it
-does in Chrome. The chrome around it is one file, KONEKT-style: `browser.html`.
+Two builds, one design language:
+
+- **Desktop** (`main.js` + `browser.html`): Chromium via Electron, so every site
+  renders exactly as in Chrome. The chrome is one file, KONEKT-style.
+- **Android** (`android/`): a framework-only native app (no Gradle, no androidx)
+  around the system WebView — tabs, a thumb-friendly bottom bar, the Speed Dial
+  start page, the same ad blocker. Tiny APK (≈60 KB) because the engine is the
+  OS WebView. Build with `scripts/build-android.ps1` → `dist/KONEKT-Browser-android.apk`.
 
 ## Run it
 

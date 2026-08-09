@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>Speed Dial</title>
+<style>
+:root{
+  --bg:#000; --hover:#0d0d0d; --line:#434343; --line-2:#666; --line-3:#232323;
+  --text:#fff; --dim:#999; --dim-2:#6f6f6f; --accent:#1d9bf0;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{background:var(--bg);color:var(--text);font-family:sans-serif;min-height:100vh;
+  display:flex;flex-direction:column;align-items:center;padding:9vh 20px 40px}
+.clock{font-size:14px;color:var(--dim);letter-spacing:.04em;margin-bottom:3.4vh;font-weight:500}
+.clock b{color:var(--text);font-weight:700}
+.lg{display:inline-flex;align-items:center;font-weight:800;font-size:40px;line-height:1;margin-bottom:4.5vh;letter-spacing:-.01em}
+.lg svg{display:block;margin:0 -1px}
+.search{width:100%;max-width:520px;height:46px;border:1px solid var(--line-2);display:flex;align-items:center;margin-bottom:5vh;background:var(--bg)}
+.search svg{flex:0 0 auto;margin:0 12px 0 14px;opacity:.6}
+.search input{flex:1;background:none;border:0;outline:0;color:var(--text);font-size:15px;height:100%;font-weight:500}
+.search input::placeholder{color:var(--dim-2)}
+.h{align-self:flex-start;width:100%;max-width:520px;margin:0 auto 10px;font-size:9.5px;text-transform:uppercase;letter-spacing:.16em;color:var(--dim);font-weight:500}
+.grid{width:100%;max-width:520px;display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-bottom:26px}
+.tile{position:relative;border:1px solid var(--line);padding:16px 8px 13px;display:flex;flex-direction:column;align-items:center;gap:9px;min-width:0}
+.tile:active{background:var(--hover)}
+.tile .g{width:34px;height:34px;display:flex;align-items:center;justify-content:center;font-size:19px;font-weight:800;border:1px solid var(--line-3)}
+.tile .l{font-size:10.5px;font-weight:600;color:var(--dim);max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tile .del{position:absolute;top:0;right:0;width:28px;height:28px;display:flex;align-items:center;justify-content:center;color:var(--dim-2);font-size:13px}
+#form{width:100%;max-width:520px;border:1px solid var(--line);padding:12px;display:none;flex-direction:column;gap:8px;margin:-16px 0 26px}
+#form.open{display:flex}
+#form input{background:none;border:1px solid var(--line-2);color:var(--text);font-size:13px;padding:10px;outline:0}
+#form .r{display:flex;gap:8px;justify-content:flex-end}
+#form button{padding:10px 18px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;border:1px solid var(--line-2);background:none;color:var(--text);font-family:inherit}
+#form button.solid{background:var(--text);color:var(--bg);border-color:var(--text)}
+.foot{margin-top:auto;padding-top:5vh;font-size:9.5px;color:var(--dim-2);text-align:center;line-height:1.7}
+</style>
+</head>
+<body>
+<div class="clock" id="clock"></div>
+<div class="lg">K<svg viewBox="-56 -56 112 112" width="31" height="31" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="7.4"><circle r="50"/><ellipse rx="18" ry="50"/><ellipse rx="36.5" ry="50"/><line y1="-50" y2="50"/><line x1="-48.7" y1="0" x2="48.7" y2="0"/><line x1="-43.6" y1="21.5" x2="43.6" y2="21.5"/><line x1="-43.6" y1="-21.5" x2="43.6" y2="-21.5"/><line x1="-31" y1="38" x2="31" y2="38"/><line x1="-31" y1="-38" x2="31" y2="-38"/></g></svg>NEKT</div>
+
+<div class="search">
+  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#fff" stroke-width="1.7" stroke-linecap="round"><path d="M15.5 15.5 21 21M17 10.5a6.5 6.5 0 1 1-13 0 6.5 6.5 0 0 1 13 0"/></svg>
+  <input id="q" autocomplete="off" spellcheck="false">
+</div>
+
+<div class="h">Speed Dial</div>
+<div class="grid" id="grid"></div>
+
+<div id="form">
+  <input id="fu" placeholder="Address — e.g. konekt.network" spellcheck="false">
+  <input id="ft" placeholder="Name (optional)" spellcheck="false">
+  <div class="r"><button onclick="closeForm()">Cancel</button><button class="solid" onclick="addDial()">Add</button></div>
+</div>
+
+<div class="foot">© 2026 KONEKT · NKO INTL. FOUNDATION OF<br>TECHNOLOGICAL RESEARCH &amp; DEVELOPMENT</div>
+
+<script>
+'use strict';
+var KONEKT_TILE = { host:'KONEKT', u:'https://konekt-tawny.vercel.app', mark:true };
+
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, function(c){
+  return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+
+function globe(px){
+  return '<svg viewBox="-56 -56 112 112" width="'+px+'" height="'+px+'"><g fill="none" stroke="currentColor" stroke-width="7.4">'+
+    '<circle r="50"/><ellipse rx="18" ry="50"/><ellipse rx="36.5" ry="50"/><line y1="-50" y2="50"/>'+
+    '<line x1="-48.7" y1="0" x2="48.7" y2="0"/><line x1="-43.6" y1="21.5" x2="43.6" y2="21.5"/>'+
+    '<line x1="-43.6" y1="-21.5" x2="43.6" y2="-21.5"/></g></svg>';
+}
+
+function clock(){
+  var d = new Date();
+  var days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  var months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  document.getElementById('clock').innerHTML = '<b>' +
+    ('0'+d.getHours()).slice(-2) + ':' + ('0'+d.getMinutes()).slice(-2) + '</b> · ' +
+    days[d.getDay()] + ' ' + d.getDate() + ' ' + months[d.getMonth()];
+}
+clock(); setInterval(clock, 15000);
+
+function bridge(fn, arg1, arg2){
+  try {
+    if (!window.KB) return null;
+    if (fn === 'dials') return JSON.parse(KB.dials());
+    if (fn === 'top') return JSON.parse(KB.topSites());
+    if (fn === 'engine') return KB.engineName();
+    if (fn === 'go') return KB.go(arg1);
+    if (fn === 'add') return KB.addDial(arg1, arg2);
+    if (fn === 'del') return KB.delDial(arg1);
+  } catch (e) {}
+  return null;
+}
+
+var q = document.getElementById('q');
+q.placeholder = 'Search ' + (bridge('engine') || 'the web') + ' or enter address';
+q.addEventListener('keydown', function(e){
+  if (e.key === 'Enter' && q.value.trim()) bridge('go', q.value.trim());
+});
+
+function render(){
+  var dials = bridge('dials') || [];
+  var top = bridge('top') || [];
+  var tiles = [];
+  for (var i = 0; i < dials.length; i++)
+    tiles.push({ host: dials[i].t || dials[i].u, u: dials[i].u, del: dials[i].u });
+  tiles.push(KONEKT_TILE);
+  for (var j = 0; j < top.length && tiles.length < 8; j++)
+    tiles.push({ host: top[j].host, u: top[j].u });
+
+  var html = '';
+  for (var k = 0; k < tiles.length; k++) {
+    var s = tiles[k];
+    html += '<div class="tile" data-go="'+esc(s.u)+'"><span class="g">'+
+      (s.mark ? globe(24) : esc(String(s.host).charAt(0).toUpperCase() || '·'))+
+      '</span><span class="l">'+esc(s.host)+'</span>'+
+      (s.del ? '<span class="del" data-del="'+esc(s.del)+'">✕</span>' : '')+
+      '</div>';
+  }
+  html += '<div class="tile" id="addTile"><span class="g">+</span><span class="l">Add site</span></div>';
+  document.getElementById('grid').innerHTML = html;
+}
+render();
+
+document.getElementById('grid').addEventListener('click', function(e){
+  var del = e.target.closest('[data-del]');
+  if (del){ bridge('del', del.getAttribute('data-del')); render(); return; }
+  if (e.target.closest('#addTile')){
+    document.getElementById('form').className = 'open';
+    document.getElementById('fu').focus();
+    return;
+  }
+  var go = e.target.closest('[data-go]');
+  if (go) bridge('go', go.getAttribute('data-go'));
+});
+
+function closeForm(){ document.getElementById('form').className = ''; }
+function addDial(){
+  var u = document.getElementById('fu').value.trim();
+  if (!u) return;
+  bridge('add', u, document.getElementById('ft').value.trim());
+  document.getElementById('fu').value = ''; document.getElementById('ft').value = '';
+  closeForm(); render();
+}
+</script>
+</body>
+</html>
