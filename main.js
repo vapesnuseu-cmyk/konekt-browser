@@ -226,6 +226,9 @@ function createWindow() {
     if (cmd === 'browser-forward') send('chord', 'alt+right');
   });
 
+  win.webContents.on('console-message', (_e, level, message, line, src) => {
+    if (level >= 2) console.log('RENDERER[' + level + '] ' + message + ' @' + (src || '') + ':' + line);
+  });
   win.loadFile('browser.html');
 }
 
@@ -392,6 +395,8 @@ async function runSmoke() {
     fs.writeFileSync(path.join(smokeDir, 'smoke-start.png'),
       (await win.webContents.capturePage()).toPNG());
     out.startPage = true;
+    out.sidebarAt = await win.webContents.executeJavaScript(
+      '(function(){var el=document.elementFromPoint(23,132);return el?(el.id||el.tagName):"null";})()');
 
     await win.webContents.executeJavaScript('KB.smokeNav("https://example.com")');
     let st = {};
@@ -459,6 +464,13 @@ async function runSmoke() {
     fs.writeFileSync(path.join(smokeDir, 'smoke-geek.png'),
       (await win.webContents.capturePage()).toPNG());
     await win.webContents.executeJavaScript('settings.mode="dark",applyTheme(),undefined');
+
+    /* pinboard edit mode — per-widget styles + scale controls */
+    await win.webContents.executeJavaScript('KB.smokeEdit(), undefined');
+    await delay(900);
+    fs.writeFileSync(path.join(smokeDir, 'smoke-editboard.png'),
+      (await win.webContents.capturePage()).toPNG());
+    await win.webContents.executeJavaScript('hudEdit=false,settings.hudStyle={},renderStart(),undefined');
 
     /* account modal (sign in / create) */
     await win.webContents.executeJavaScript('kpanelToggle(false), KB.smokeAccount(), undefined');

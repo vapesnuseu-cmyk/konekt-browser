@@ -149,7 +149,7 @@ svg{display:block}
 .pbtn.solid:hover{background:var(--btn-h)}
 
 /* ---------------- sidebar + KONEKT panel (Opera-style) ---------------- */
-#main{flex:1 1 auto;display:flex;min-height:0}
+#main{flex:1 1 auto;display:flex;min-height:0;position:relative}
 #side{flex:0 0 46px;display:flex;flex-direction:column;align-items:center;gap:2px;
   padding:8px 0;border-right:1px solid var(--line-3)}
 .sbtn{width:36px;height:36px;display:flex;align-items:center;justify-content:center;
@@ -199,6 +199,9 @@ webview.wv.htmlfs{position:fixed;inset:0;z-index:120;visibility:visible}
 #start{position:absolute;inset:0;display:none;overflow-y:auto}
 #start.on{display:block}
 .st-wrap{max-width:660px;margin:0 auto;padding:9vh 24px 40px;display:flex;flex-direction:column;align-items:center}
+/* the HUD board breaks out of the centred column to the full page width */
+.st-wrap.hud-wide{max-width:min(1600px,96vw);padding-top:4vh}
+.st-wrap.hud-wide .st-logo,.st-wrap.hud-wide .hud-toolbar,.st-wrap.hud-wide .st-foot{align-self:center}
 .st-clock{font-size:15px;font-weight:600;color:var(--dim);letter-spacing:.04em;margin-bottom:4vh}
 .st-clock b{color:var(--text);font-weight:700}
 .st-logo{margin-bottom:5vh}
@@ -231,6 +234,13 @@ webview.wv.htmlfs{position:fixed;inset:0;z-index:120;visibility:visible}
 .hud-board.edit .hud-card{box-shadow:0 0 0 1px var(--line-3)}
 .hud-board.edit .hud-drag{cursor:grab}
 .hud-card.dragging{opacity:.9;z-index:20;box-shadow:0 10px 34px rgba(0,0,0,.55)}
+/* per-widget appearance (cycled from the droplet button in Edit board) */
+.hud-st-glass{background:var(--glass-bg,rgba(20,20,26,.5));-webkit-backdrop-filter:blur(14px) saturate(1.5);backdrop-filter:blur(14px) saturate(1.5)}
+.hud-st-solid{background:var(--bg)}
+.hud-st-clear{background:transparent;border-color:transparent}
+.hud-st-clear .hud-h{border-color:transparent;background:transparent}
+.hud-st-accent{background:color-mix(in srgb,var(--accent) 14%,var(--hover));border-color:color-mix(in srgb,var(--accent) 42%,var(--line))}
+.hud-st-accent .hud-h{color:var(--accent);border-color:color-mix(in srgb,var(--accent) 30%,var(--line-3))}
 .hud-rz{position:absolute;right:0;bottom:0;width:15px;height:15px;display:none;cursor:nwse-resize;z-index:2}
 .hud-board.edit .hud-rz{display:block;background:linear-gradient(135deg,transparent 45%,var(--line-2) 45%,var(--line-2) 60%,transparent 60%,transparent 75%,var(--line-2) 75%)}
 .hud-clock{font-size:clamp(20px,4vw,30px);display:flex;align-items:center;justify-content:center;height:100%}
@@ -446,7 +456,7 @@ body{background-color:var(--bg);background-image:var(--wall,none);background-siz
 :root{--ui:1;--radius:0px}
 :root[data-fs="s"]{--ui:.94}
 :root[data-fs="l"]{--ui:1.09}
-#bar,#side,#kpanel,#start,.panel,#menu,.modal,.acc-modal,#findbar,#permbar,#toasts,#status{zoom:var(--ui)}
+#bar,#start,.panel,#menu,.modal,.acc-modal,#findbar,#permbar,#toasts,#status{zoom:var(--ui)}
 
 /* uppercase interface toggle */
 :root[data-caps="off"] .set-h,:root[data-caps="off"] .p-head h3,:root[data-caps="off"] .st-h,
@@ -684,9 +694,6 @@ body{background-color:var(--bg);background-image:var(--wall,none);background-siz
 
   <div id="menu"></div>
 
-  <div id="drawerShade"></div>
-  <div id="drawer"></div>
-
   <div id="shade">
     <div class="modal">
       <div class="mo-head"><h2>Settings</h2><button class="p-x" id="setX"></button></div>
@@ -704,6 +711,8 @@ body{background-color:var(--bg);background-image:var(--wall,none);background-siz
   <div id="status"></div>
   <div id="toasts"></div>
 </div>
+<div id="drawerShade"></div>
+<div id="drawer"></div>
 </div>
 
 <script>
@@ -711,6 +720,7 @@ body{background-color:var(--bg);background-image:var(--wall,none);background-siz
 /* ================================================================
    KONEKT BROWSER — chrome logic. Vanilla JS, zero deps.
    ================================================================ */
+window.addEventListener('error', e => { window.__bootErr = (window.__bootErr || '') + (e.message || e.error) + ' @' + (e.lineno || '?') + ' | '; });
 const bridge = window.konektBridge;
 const $ = s => document.querySelector(s);
 const $$ = s => document.querySelectorAll(s);
@@ -747,6 +757,7 @@ function ic(name, size){
     home:'M4 11l8-7 8 7M6.5 9.6V20h11V9.6',
     user:'M12 12.4a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM5 20c.6-3.4 3.3-5.4 7-5.4s6.4 2 7 5.4',
     menu:'M4 7h16M4 12h16M4 17h16',
+    drop:'M12 3s6.5 7 6.5 11.5a6.5 6.5 0 0 1-13 0C5.5 10 12 3 12 3z',
     shield:'M12 3l7 2.6v5.1c0 4.6-2.9 8.5-7 10.3-4.1-1.8-7-5.7-7-10.3V5.6z',
     out:'M13 5h6v6M19 5l-9 9M9 6H5v13h13v-4',
     pip:'M3 6h18v12H3zM12 12h7v5h-7z',
@@ -805,6 +816,9 @@ const settings = Object.assign({
   bgCol:'', lineCol:'', textCol:'',   // custom-scheme colours
   /* HUD dashboard */
   hud:['clock','search','speeddial','weather','news'],   // enabled widgets, in order
+  hudLayout:{},         // { id: {x,y,w,h} } free positions on the grid
+  hudStyle:{},          // { id: 'default'|'glass'|'solid'|'clear'|'accent' }
+  hudRow:86,            // pin grid row height (scale)
   hudLoc:null,          // { name, lat, lon } for weather
   markets:['bitcoin','ethereum'],
   notes:''
@@ -1070,23 +1084,27 @@ function renderStart(){
   const hud = (Array.isArray(settings.hud) ? settings.hud : ['clock','search','speeddial']).filter(id => WIDGETS[id]);
   const lay = hudLayout();
   let maxRow = 3;
+  const styleOf = id => (settings.hudStyle && settings.hudStyle[id]) || 'default';
   const cards = hud.map(id => {
     const w = WIDGETS[id], L = lay[id] || { x:0, y:0, w:2, h:2 };
     maxRow = Math.max(maxRow, L.y + L.h);
-    return '<div class="hud-card" data-widget="'+id+'" data-x="'+L.x+'" data-y="'+L.y+'" data-w="'+L.w+'" data-h="'+L.h+'">'
+    return '<div class="hud-card hud-st-'+styleOf(id)+'" data-widget="'+id+'" data-x="'+L.x+'" data-y="'+L.y+'" data-w="'+L.w+'" data-h="'+L.h+'">'
       + '<div class="hud-h hud-drag"><span>'+esc(w.name)+'</span><span class="sp"></span>'
       + (w.refresh ? '<button data-refresh="'+id+'" title="Refresh">'+ic('reload',12)+'</button>' : '')
+      + (hudEdit ? '<button data-hudstyle="'+id+'" title="Widget appearance">'+ic('drop',12)+'</button>' : '')
       + (hudEdit ? '<button data-hudrm="'+id+'" title="Remove">'+ic('x',12)+'</button>' : '')
       + '</div><div class="hud-b" id="hud-'+id+'">'+(w.render ? w.render() : '')+'</div>'
       + '<span class="hud-rz" data-rz="'+id+'"></span></div>';
   }).join('');
-  $('#start').innerHTML = '<div class="st-wrap">'
+  $('#start').innerHTML = '<div class="st-wrap hud-wide">'
     + '<div class="st-logo" style="margin-bottom:2vh">'+logoLong(40)+'</div>'
     + '<div class="hud-toolbar">'
       + '<button id="hudEditBtn" class="hud-customize'+(hudEdit?' on':'')+'">'+ic('gear',13)+(hudEdit?'Done':'Edit board')+'</button>'
       + (hudEdit ? '<button id="hudAddBtn" class="hud-customize">'+ic('plus',13)+'Widgets</button>' : '')
+      + (hudEdit ? '<button id="hudScaleDn" class="hud-customize" title="Smaller pins">'+ic('x',12)+' size</button>' : '')
+      + (hudEdit ? '<button id="hudScaleUp" class="hud-customize" title="Bigger pins">'+ic('plus',12)+' size</button>' : '')
     + '</div>'
-    + '<div class="hud-board'+(hudEdit?' edit':'')+'" id="hudBoard" style="height:'+(maxRow*HUD_ROW)+'px">'+cards+'</div>'
+    + '<div class="hud-board'+(hudEdit?' edit':'')+'" id="hudBoard" style="height:'+(maxRow*hudRowH())+'px">'+cards+'</div>'
     + '<div class="st-foot">© 2026 KONEKT · NKO Intl. Foundation of Technological Research &amp; Development</div>'
     + '</div>';
   layoutBoard();
@@ -1099,6 +1117,9 @@ function renderStart(){
   hud.forEach(id => { const w = WIDGETS[id]; const el = $('#hud-'+id); if (w.wire) w.wire(el); if (w.load) w.load(el); });
   $('#hudEditBtn').onclick = () => { hudEdit = !hudEdit; renderStart(); };
   const addB = $('#hudAddBtn'); if (addB) addB.onclick = openHudCustomize;
+  const su = $('#hudScaleUp'), sd = $('#hudScaleDn');
+  if (su) su.onclick = () => { settings.hudRow = Math.min(160, hudRowH() + 12); saveSettings(); layoutBoard(); };
+  if (sd) sd.onclick = () => { settings.hudRow = Math.max(48, hudRowH() - 12); saveSettings(); layoutBoard(); };
   if (hudEdit) wireBoardDnD();
   syncStartFx();
 }
@@ -1109,11 +1130,11 @@ function layoutBoard(){
   let maxRow = 3;
   board.querySelectorAll('.hud-card').forEach(c => {
     const x=+c.dataset.x, y=+c.dataset.y, w=+c.dataset.w, h=+c.dataset.h;
-    c.style.left = (x*cw)+'px'; c.style.top = (y*HUD_ROW)+'px';
-    c.style.width = (w*cw-HUD_GAP)+'px'; c.style.height = (h*HUD_ROW-HUD_GAP)+'px';
+    c.style.left = (x*cw)+'px'; c.style.top = (y*hudRowH())+'px';
+    c.style.width = (w*cw-HUD_GAP)+'px'; c.style.height = (h*hudRowH()-HUD_GAP)+'px';
     maxRow = Math.max(maxRow, y+h);
   });
-  board.style.height = (maxRow*HUD_ROW)+'px';
+  board.style.height = (maxRow*hudRowH())+'px';
 }
 let boardRz = null;
 window.addEventListener('resize', () => { clearTimeout(boardRz); boardRz = setTimeout(() => { if ($('#hudBoard')) layoutBoard(); }, 120); });
@@ -1187,11 +1208,11 @@ function wireBoardDnD(){
       const px = e.clientX - drag.br.left - drag.ox, py = e.clientY - drag.br.top - drag.oy;
       card.style.left = px+'px'; card.style.top = py+'px';
       drag._x = Math.max(0, Math.min(HUD_COLS-(+card.dataset.w), Math.round(px/c)));
-      drag._y = Math.max(0, Math.round(py/HUD_ROW));
+      drag._y = Math.max(0, Math.round(py/hudRowH()));
     } else {
       const w = Math.max(1, Math.min(HUD_COLS-(+card.dataset.x), Math.round((e.clientX-drag.br.left-card.offsetLeft)/c)));
-      const h = Math.max(1, Math.round((e.clientY-drag.br.top-card.offsetTop)/HUD_ROW));
-      card.style.width = (w*c-HUD_GAP)+'px'; card.style.height = (h*HUD_ROW-HUD_GAP)+'px'; drag._w = w; drag._h = h;
+      const h = Math.max(1, Math.round((e.clientY-drag.br.top-card.offsetTop)/hudRowH()));
+      card.style.width = (w*c-HUD_GAP)+'px'; card.style.height = (h*hudRowH()-HUD_GAP)+'px'; drag._w = w; drag._h = h;
     }
   });
   const done = () => {
@@ -1262,13 +1283,14 @@ const WIDGETS = {
   readinglist:{ name:'Reading list', render:rlWidgetHTML }
 };
 /* pinboard grid — 6 columns; positions in settings.hudLayout {id:{x,y,w,h}} */
-const HUD_COLS = 6, HUD_ROW = 86, HUD_GAP = 12;
+const HUD_COLS = 8, HUD_GAP = 12;
 const HUD_DEFAULT_LAYOUT = {
-  clock:{x:0,y:0,w:6,h:1}, search:{x:1,y:1,w:4,h:1}, speeddial:{x:0,y:2,w:6,h:2},
-  weather:{x:0,y:4,w:2,h:2}, news:{x:2,y:4,w:4,h:3}, markets:{x:0,y:6,w:2,h:2},
-  notes:{x:4,y:4,w:2,h:2}, bookmarks:{x:4,y:6,w:2,h:2}, readinglist:{x:2,y:7,w:4,h:2}
+  clock:{x:1,y:0,w:6,h:1}, search:{x:2,y:1,w:4,h:1}, speeddial:{x:1,y:2,w:6,h:2},
+  weather:{x:1,y:4,w:2,h:2}, news:{x:3,y:4,w:4,h:3}, markets:{x:1,y:6,w:2,h:2},
+  notes:{x:5,y:4,w:2,h:2}, bookmarks:{x:5,y:6,w:2,h:2}, readinglist:{x:3,y:7,w:4,h:2}
 };
 function hudLayout(){ return Object.assign({}, HUD_DEFAULT_LAYOUT, settings.hudLayout || {}); }
+function hudRowH(){ return Math.max(48, Math.min(160, parseInt(settings.hudRow,10) || 86)); }
 let hudEdit = false;
 const HUD_ALL = [['clock','Clock & date'],['search','Search box'],['speeddial','Speed Dial'],['weather','Weather'],
   ['news','News — Hacker News'],['markets','Markets — crypto'],['notes','Notes'],['bookmarks','Bookmarks'],['readinglist','Reading list']];
@@ -2252,6 +2274,12 @@ $('#start').addEventListener('click', e => {
   if (drl){ readingList = readingList.filter(x => x.u !== drl.dataset.delrl); save('kb.reading', readingList); renderStart(); return; }
   const hrm = e.target.closest('[data-hudrm]');
   if (hrm){ settings.hud = settings.hud.filter(x => x !== hrm.dataset.hudrm); saveSettings(); renderStart(); return; }
+  const hst = e.target.closest('[data-hudstyle]');
+  if (hst){ const id = hst.dataset.hudstyle; const order = ['default','glass','solid','clear','accent'];
+    const cur = (settings.hudStyle && settings.hudStyle[id]) || 'default';
+    const next = order[(order.indexOf(cur) + 1) % order.length];
+    settings.hudStyle = Object.assign({}, settings.hudStyle || {}, { [id]: next });
+    saveSettings(); renderStart(); toast('Widget style: ' + next); return; }
   if (e.target.closest('#dialForm') || e.target.closest('#stAdd') || e.target.closest('.hud-notes')) return;
   const go = e.target.closest('[data-go]');
   if (go) navigate(AT(), go.dataset.go);
@@ -2308,7 +2336,7 @@ function collectData(){
     appearance: { mode: settings.mode, accent: settings.accent, wallpaper: settings.wallpaper, density: settings.density,
                   fs: settings.fs, caps: settings.caps, radius: settings.radius, avRound: settings.avRound,
                   motion: settings.motion, bgCol: settings.bgCol, lineCol: settings.lineCol, textCol: settings.textCol },
-    hud: { widgets: settings.hud, layout: settings.hudLayout, loc: settings.hudLoc, markets: settings.markets, notes: settings.notes }
+    hud: { widgets: settings.hud, layout: settings.hudLayout, style: settings.hudStyle, row: settings.hudRow, loc: settings.hudLoc, markets: settings.markets, notes: settings.notes }
   };
 }
 function mergeIn(d){
@@ -2339,6 +2367,8 @@ function mergeIn(d){
   if (d.hud && typeof d.hud === 'object'){
     if (Array.isArray(d.hud.widgets)) settings.hud = d.hud.widgets;
     if (d.hud.layout && typeof d.hud.layout === 'object') settings.hudLayout = d.hud.layout;
+    if (d.hud.style && typeof d.hud.style === 'object') settings.hudStyle = d.hud.style;
+    if (d.hud.row) settings.hudRow = d.hud.row;
     if (d.hud.loc !== undefined) settings.hudLoc = d.hud.loc;
     if (Array.isArray(d.hud.markets)) settings.markets = d.hud.markets;
     if (typeof d.hud.notes === 'string') settings.notes = d.hud.notes;
@@ -2568,6 +2598,7 @@ window.KB = {
   smokeGlass(){ settings.mode = 'glass'; settings.accent = '#a970ff'; applyTheme(); navigate(AT(), START); },
   smokeCustom(){ Object.assign(settings, { mode:'custom', bgCol:'#0d1b2a', lineCol:'#2a4a6b', textCol:'#eaf2ff', accent:'#00ba7c', radius:12, wallpaper:'', fs:'m' }); applyTheme(); navigate(AT(), START); },
   smokeGeek(){ settings.mode = 'geek'; applyTheme(); navigate(AT(), START); },
+  smokeEdit(){ settings.mode = 'dark'; applyTheme(); hudEdit = true; settings.hudStyle = { weather:'accent', news:'glass', markets:'accent' }; navigate(AT(), START); },
   smokeSettingsAppearance(){ openSettings(); },
   smokeAccount(){ openAccount(); },
   smokeSettings(){ openSettings(); },
