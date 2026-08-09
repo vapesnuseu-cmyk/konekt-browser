@@ -258,11 +258,34 @@ public class BrowserActivity extends Activity {
   String mode() { return prefs.getString("mode", "dark"); }
   String wall() { return prefs.getString("wallpaper", "none"); }
 
+  boolean caps = true;
+  float luma(int c) { return (0.2126f*((c>>16)&255) + 0.7152f*((c>>8)&255) + 0.0722f*(c&255)) / 255f; }
+  int mix(int a, int b, float t) {
+    int ar=(a>>16)&255, ag=(a>>8)&255, ab=a&255, br=(b>>16)&255, bg=(b>>8)&255, bb=b&255;
+    int r=Math.round(ar+(br-ar)*t), g=Math.round(ag+(bg-ag)*t), bl=Math.round(ab+(bb-ab)*t);
+    return 0xFF000000 | (r<<16) | (g<<8) | bl;
+  }
+  boolean sysNight() { return (getResources().getConfiguration().uiMode & android.content.res.Configuration.UI_MODE_NIGHT_MASK) == android.content.res.Configuration.UI_MODE_NIGHT_YES; }
+
   void computePalette() {
     String m = mode();
     glass = m.equals("glass");
+    caps = !prefs.getString("caps", "on").equals("off");
     ACCENT = parseColor(prefs.getString("accent", "#1d9bf0"), 0xFF1D9BF0);
-    if (m.equals("light")) {
+    String bgc = prefs.getString("bgCol", "");
+    String eff = m.equals("system") ? (sysNight() ? "dark" : "light") : m;
+
+    if (m.equals("custom") && !bgc.isEmpty()) {
+      int bg = parseColor(bgc, 0xFF000000);
+      boolean lightBase = luma(bg) > 0.5f;
+      int ink = parseColor(prefs.getString("textCol", ""), lightBase ? 0xFF000000 : 0xFFFFFFFF);
+      BG = bg; TEXT = ink; HOVER2 = mix(bg, ink, 0.12f);
+      String lineC = prefs.getString("lineCol", "");
+      int line = lineC.isEmpty() ? mix(bg, ink, 0.28f) : parseColor(lineC, 0xFF434343);
+      LINE = line; LINE2 = mix(line, ink, 0.35f); LINE3 = mix(line, bg, 0.55f);
+      DIM = mix(ink, bg, 0.40f); DIM2 = mix(ink, bg, 0.60f);
+      BAR = bg;
+    } else if (eff.equals("light")) {
       BG = 0xFFFFFFFF; HOVER2 = 0xFFE8E8E8;
       LINE = 0xFFC4C4C4; LINE2 = 0xFF8F8F8F; LINE3 = 0xFFE2E2E2;
       TEXT = 0xFF000000; DIM = 0xFF666666; DIM2 = 0xFF8A8A8A;
@@ -275,6 +298,8 @@ public class BrowserActivity extends Activity {
     }
     if (glass) BAR = alpha(BG, 0xCC);   // translucent bars over the page/wallpaper
   }
+  int radiusPx() { int r = 0; try { r = Integer.parseInt(prefs.getString("radius", "0")); } catch (Exception e) {} return dp(Math.max(0, Math.min(24, r))); }
+  int textZoom() { String f = prefs.getString("fs", "m"); return f.equals("s") ? 90 : f.equals("l") ? 115 : 100; }
 
   void applyAppearance() {
     computePalette();
@@ -295,13 +320,16 @@ public class BrowserActivity extends Activity {
       addr.setTextColor(TEXT); addr.setHintTextColor(DIM2);
       GradientDrawable pill = new GradientDrawable();
       pill.setColor(glass ? alpha(TEXT, 0x14) : HOVER2);
-      pill.setCornerRadius(0);
+      pill.setCornerRadius(radiusPx());
       pill.setStroke(dp(1), LINE3);
       addr.setBackground(pill);
       addr.setPadding(dp(12), dp(6), dp(12), dp(6));
     }
     Icon[] all = { lockIc, reloadIc, backB, fwdB, tabsB, acctB, menuB };
     for (Icon ic : all) if (ic != null) ic.tint(DIM);
+    // Text size → content zoom on every tab
+    int tz = textZoom();
+    for (Tab tt : tabs) if (tt.wv != null) tt.wv.getSettings().setTextZoom(tz);
     renderChrome();
     // Speed Dial reflects the new look
     Tab t = at();
@@ -310,7 +338,12 @@ public class BrowserActivity extends Activity {
 
   String appearanceJson() {
     JSONObject o = new JSONObject();
-    try { o.put("mode", mode()); o.put("accent", prefs.getString("accent", "#1d9bf0")); o.put("wallpaper", wall()); } catch (Exception e) {}
+    try {
+      o.put("mode", mode()); o.put("accent", prefs.getString("accent", "#1d9bf0")); o.put("wallpaper", wall());
+      o.put("fs", prefs.getString("fs", "m")); o.put("radius", prefs.getString("radius", "0"));
+      o.put("caps", prefs.getString("caps", "on"));
+      o.put("bgCol", prefs.getString("bgCol", "")); o.put("textCol", prefs.getString("textCol", "")); o.put("lineCol", prefs.getString("lineCol", ""));
+    } catch (Exception e) {}
     return o.toString();
   }
 
@@ -386,6 +419,7 @@ public class BrowserActivity extends Activity {
     s.setSupportMultipleWindows(true);
     s.setJavaScriptCanOpenWindowsAutomatically(false);
     s.setMediaPlaybackRequiresUserGesture(true);
+    s.setTextZoom(textZoom());
     CookieManager.getInstance().setAcceptThirdPartyCookies(wv, true);
     wv.addJavascriptInterface(new KBridge(t), "KB");
     wv.setDownloadListener((url, ua, cd, mt, len) -> download(url, ua, cd, mt));
@@ -727,11 +761,11 @@ public class BrowserActivity extends Activity {
 
     body.addView(label("MODE"));
     LinearLayout seg = new LinearLayout(this); seg.setOrientation(LinearLayout.HORIZONTAL); seg.setPadding(dp(14), 0, dp(14), dp(6));
-    String[][] modes = {{"dark","Dark"},{"light","Light"},{"glass","Liquid Glass"}};
+    String[][] modes = {{"dark","Dark"},{"light","Light"},{"system","System"},{"glass","Glass"}};
     for (String[] m : modes) {
       final String key = m[0];
       TextView bt = new TextView(this); bt.setText(m[1]); bt.setGravity(Gravity.CENTER); bt.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11);
-      bt.setTypeface(Typeface.DEFAULT_BOLD); bt.setAllCaps(true); bt.setPadding(dp(6), dp(11), dp(6), dp(11));
+      bt.setTypeface(Typeface.DEFAULT_BOLD); bt.setAllCaps(true); bt.setPadding(dp(4), dp(11), dp(4), dp(11));
       boolean on = mode().equals(key);
       GradientDrawable g = new GradientDrawable(); g.setColor(0); g.setStroke(dp(1), on ? TEXT : LINE); bt.setBackground(g);
       bt.setTextColor(on ? TEXT : DIM);
@@ -740,6 +774,46 @@ public class BrowserActivity extends Activity {
       seg.addView(bt);
     }
     body.addView(seg);
+
+    // Text size
+    body.addView(label("TEXT SIZE"));
+    LinearLayout fsSeg = new LinearLayout(this); fsSeg.setOrientation(LinearLayout.HORIZONTAL); fsSeg.setPadding(dp(14), 0, dp(14), dp(6));
+    String[][] fss = {{"s","S"},{"m","M"},{"l","L"}};
+    for (String[] f : fss) {
+      final String key = f[0];
+      TextView bt = new TextView(this); bt.setText(f[1]); bt.setGravity(Gravity.CENTER); bt.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11);
+      bt.setTypeface(Typeface.DEFAULT_BOLD); bt.setPadding(dp(6), dp(11), dp(6), dp(11));
+      boolean on = prefs.getString("fs", "m").equals(key);
+      GradientDrawable g = new GradientDrawable(); g.setColor(0); g.setStroke(dp(1), on ? TEXT : LINE); bt.setBackground(g);
+      bt.setTextColor(on ? TEXT : DIM);
+      LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f); lp.setMargins(dp(3), 0, dp(3), 0); bt.setLayoutParams(lp);
+      bt.setOnClickListener(v -> { prefs.edit().putString("fs", key).apply(); applyAppearance(); showCustomize(); schedulePush(); });
+      fsSeg.addView(bt);
+    }
+    body.addView(fsSeg);
+
+    // Corner rounding
+    LinearLayout radHead = new LinearLayout(this); radHead.setOrientation(LinearLayout.HORIZONTAL); radHead.setGravity(Gravity.CENTER_VERTICAL);
+    TextView rl = label("CORNER ROUNDING"); rl.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)); radHead.addView(rl);
+    int radNow = 0; try { radNow = Integer.parseInt(prefs.getString("radius", "0")); } catch (Exception e) {}
+    final TextView radVal = new TextView(this); radVal.setText(radNow + "px"); radVal.setTextColor(DIM); radVal.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11); radVal.setPadding(0, 0, dp(18), 0);
+    radHead.addView(radVal); body.addView(radHead);
+    android.widget.SeekBar sb = new android.widget.SeekBar(this); sb.setMax(24); sb.setProgress(radNow);
+    sb.getProgressDrawable().setColorFilter(ACCENT, android.graphics.PorterDuff.Mode.SRC_IN);
+    sb.getThumb().setColorFilter(ACCENT, android.graphics.PorterDuff.Mode.SRC_IN);
+    LinearLayout.LayoutParams sblp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT); sblp.setMargins(dp(16), 0, dp(16), dp(6)); sb.setLayoutParams(sblp);
+    sb.setOnSeekBarChangeListener(new android.widget.SeekBar.OnSeekBarChangeListener() {
+      public void onProgressChanged(android.widget.SeekBar s2, int p, boolean fromUser) { int q = (p/2)*2; radVal.setText(q + "px"); prefs.edit().putString("radius", String.valueOf(q)).apply(); applyAppearance(); }
+      public void onStartTrackingTouch(android.widget.SeekBar s2) {}
+      public void onStopTrackingTouch(android.widget.SeekBar s2) { schedulePush(); }
+    });
+    body.addView(sb);
+
+    // Uppercase interface
+    boolean capsOn = !prefs.getString("caps", "on").equals("off");
+    body.addView(row("Uppercase interface", capsOn ? "On" : "Off", v -> {
+      prefs.edit().putString("caps", capsOn ? "off" : "on").apply(); applyAppearance(); showCustomize(); schedulePush();
+    }));
 
     body.addView(label("ACCENT"));
     LinearLayout sw = new LinearLayout(this); sw.setOrientation(LinearLayout.HORIZONTAL); sw.setPadding(dp(16), dp(2), dp(16), dp(10));
@@ -752,8 +826,31 @@ public class BrowserActivity extends Activity {
       dot.setOnClickListener(v -> { prefs.edit().putString("accent", c).apply(); applyAppearance(); showCustomize(); schedulePush(); });
       sw.addView(dot);
     }
-    ScrollView swScroll = new ScrollView(this); // horizontal not needed; wrap
     body.addView(sw);
+
+    // Custom background — picking one switches the scheme to Custom and derives the palette
+    body.addView(label("CUSTOM BACKGROUND"));
+    LinearLayout bgs = new LinearLayout(this); bgs.setOrientation(LinearLayout.HORIZONTAL); bgs.setPadding(dp(16), dp(2), dp(16), dp(12));
+    String[] BGCOLS = {"", "#0a0b0d", "#0d1b2a", "#12100b", "#0b1a12", "#1a1022", "#f4f1ea", "#ffffff"};
+    String curBg = prefs.getString("bgCol", "");
+    boolean isCustom = mode().equals("custom");
+    for (String c : BGCOLS) {
+      View dot = new View(this);
+      GradientDrawable g = new GradientDrawable(); g.setShape(GradientDrawable.OVAL);
+      if (c.isEmpty()) { g.setColor(0); g.setStroke(dp(1), LINE2); } else { g.setColor(parseColor(c, 0xFF000000)); }
+      boolean on = c.isEmpty() ? !isCustom : (isCustom && curBg.equalsIgnoreCase(c));
+      g.setStroke(dp(2), on ? TEXT : (c.isEmpty() ? LINE2 : 0));
+      dot.setBackground(g);
+      LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(28), dp(28)); lp.setMargins(0, 0, dp(12), 0); dot.setLayoutParams(lp);
+      final String col = c;
+      dot.setOnClickListener(v -> {
+        if (col.isEmpty()) prefs.edit().putString("mode", "dark").putString("bgCol", "").apply();
+        else prefs.edit().putString("mode", "custom").putString("bgCol", col).apply();
+        applyAppearance(); showCustomize(); schedulePush();
+      });
+      bgs.addView(dot);
+    }
+    body.addView(bgs);
 
     body.addView(label("WALLPAPER"));
     LinearLayout walls = new LinearLayout(this); walls.setOrientation(LinearLayout.HORIZONTAL); walls.setPadding(dp(12), dp(2), dp(12), dp(14));
@@ -906,7 +1003,14 @@ public class BrowserActivity extends Activity {
       d.put("bookmarks", new JSONArray(prefs.getString("bookmarks", "[]")));
       d.put("dials", new JSONArray(prefs.getString("dials", "[]")));
       JSONObject st = new JSONObject(); st.put("engine", engineKey()); st.put("adblock", adblockOn); d.put("settings", st);
-      JSONObject ap = new JSONObject(); ap.put("mode", mode()); ap.put("accent", prefs.getString("accent", "#1d9bf0")); ap.put("wallpaper", wall()); d.put("appearance", ap);
+      JSONObject ap = new JSONObject();
+      ap.put("mode", mode()); ap.put("accent", prefs.getString("accent", "#1d9bf0")); ap.put("wallpaper", wall());
+      ap.put("fs", prefs.getString("fs", "m"));
+      int rad = 0; try { rad = Integer.parseInt(prefs.getString("radius", "0")); } catch (Exception e) {}
+      ap.put("radius", rad);
+      ap.put("caps", !prefs.getString("caps", "on").equals("off"));
+      ap.put("bgCol", prefs.getString("bgCol", "")); ap.put("textCol", prefs.getString("textCol", "")); ap.put("lineCol", prefs.getString("lineCol", ""));
+      d.put("appearance", ap);
     } catch (Exception ignored) {}
     return d;
   }
@@ -917,7 +1021,18 @@ public class BrowserActivity extends Activity {
       if (d.has("bookmarks")) ed.putString("bookmarks", d.getJSONArray("bookmarks").toString());
       if (d.has("dials")) ed.putString("dials", d.getJSONArray("dials").toString());
       if (d.has("settings")) { JSONObject st = d.getJSONObject("settings"); if (st.has("engine")) ed.putString("engine", st.getString("engine")); if (st.has("adblock")) ed.putBoolean("adblock", st.getBoolean("adblock")); }
-      if (d.has("appearance")) { JSONObject ap = d.getJSONObject("appearance"); if (ap.has("mode")) ed.putString("mode", ap.getString("mode")); if (ap.has("accent")) ed.putString("accent", ap.getString("accent")); if (ap.has("wallpaper")) ed.putString("wallpaper", ap.getString("wallpaper")); }
+      if (d.has("appearance")) {
+        JSONObject ap = d.getJSONObject("appearance");
+        if (ap.has("mode")) ed.putString("mode", ap.getString("mode"));
+        if (ap.has("accent")) ed.putString("accent", ap.getString("accent"));
+        if (ap.has("wallpaper")) ed.putString("wallpaper", ap.getString("wallpaper"));
+        if (ap.has("fs")) ed.putString("fs", ap.getString("fs"));
+        if (ap.has("radius")) ed.putString("radius", String.valueOf(ap.optInt("radius", 0)));
+        if (ap.has("caps")) ed.putString("caps", ap.optBoolean("caps", true) ? "on" : "off");
+        if (ap.has("bgCol")) ed.putString("bgCol", ap.getString("bgCol"));
+        if (ap.has("textCol")) ed.putString("textCol", ap.getString("textCol"));
+        if (ap.has("lineCol")) ed.putString("lineCol", ap.getString("lineCol"));
+      }
       ed.apply();
       adblockOn = prefs.getBoolean("adblock", true);
     } catch (Exception ignored) {}

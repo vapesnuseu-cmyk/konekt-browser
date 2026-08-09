@@ -384,6 +384,19 @@ async function runSmoke() {
       (await win.webContents.capturePage()).toPNG());
     out.appearance = await win.webContents.executeJavaScript('KB.appearanceState()');
 
+    /* custom colour scheme + rounded corners */
+    await win.webContents.executeJavaScript('KB.smokeCustom(), undefined');
+    await delay(1400);
+    fs.writeFileSync(path.join(smokeDir, 'smoke-custom.png'),
+      (await win.webContents.capturePage()).toPNG());
+
+    /* the full appearance settings panel */
+    await win.webContents.executeJavaScript('KB.smokeSettingsAppearance(), undefined');
+    await delay(700);
+    fs.writeFileSync(path.join(smokeDir, 'smoke-appearance.png'),
+      (await win.webContents.capturePage()).toPNG());
+    await win.webContents.executeJavaScript('$("#shade").classList.remove("open"), undefined');
+
     /* account modal (sign in / create) */
     await win.webContents.executeJavaScript('kpanelToggle(false), KB.smokeAccount(), undefined');
     await delay(700);

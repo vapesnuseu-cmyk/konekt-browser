@@ -28,6 +28,20 @@ Two builds, one design language:
 - **In-app updates** — Settings → *Check for updates* compares your build to the
   latest GitHub release and links straight to the download.
 
+### New in 1.2 — full appearance parity with KONEKT
+
+The browser now mirrors KONEKT's own appearance settings:
+
+- **Colour scheme**: Dark / Light / System / Liquid Glass / **Custom**.
+- **Custom colours** (desktop: Background, Outlines, Text; Android: a curated
+  background palette) — the greys are derived from the background by perceived
+  brightness so text stays legible, with a low-contrast warning.
+- **Accent** swatches plus a full custom-colour picker (desktop).
+- **Text size** (S / M / L), **Corner rounding** (0–24px, cubic by default),
+  **Uppercase interface** toggle, **Reduce motion**, **Round avatar**, layout
+  **density**, and the six **wallpapers**. Everything syncs across devices and a
+  **Reset appearance** returns to the original KONEKT look.
+
 ## Run it
 
 Double-click **`KONEKT Browser.cmd`** — or from a terminal:

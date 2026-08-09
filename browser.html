@@ -340,6 +340,31 @@ body{background-color:var(--bg);background-image:var(--wall,none);background-siz
 [data-density="compact"] .nav-item,[data-density="compact"] .set-row{padding-top:8px;padding-bottom:8px}
 [data-density="compact"] .p-row{padding-top:5px;padding-bottom:5px}
 
+/* interface scale — mirrors KONEKT's Text size (S/M/L) as a chrome UI scale;
+   the web content itself keeps per-tab zoom (Ctrl +/-) */
+:root{--ui:1;--radius:0px}
+:root[data-fs="s"]{--ui:.94}
+:root[data-fs="l"]{--ui:1.09}
+#bar,#side,#kpanel,#start,.panel,#menu,.modal,.acc-modal,#findbar,#permbar,#toasts,#status{zoom:var(--ui)}
+
+/* uppercase interface toggle */
+:root[data-caps="off"] .set-h,:root[data-caps="off"] .p-head h3,:root[data-caps="off"] .st-h,
+:root[data-caps="off"] .kp-t,:root[data-caps="off"] .acc-tag,:root[data-caps="off"] .auth-sub,
+:root[data-caps="off"] .pbtn,:root[data-caps="off"] .auth-go,:root[data-caps="off"] .acc-row button,
+:root[data-caps="off"] .seg button,:root[data-caps="off"] .p-act,:root[data-caps="off"] .dl .da,
+:root[data-caps="off"] .m-row .mk,:root[data-caps="off"] .err-card button{text-transform:none;letter-spacing:normal}
+
+/* reduce motion */
+:root[data-motion="off"] *,:root[data-motion="off"] *::before,:root[data-motion="off"] *::after{
+  animation-duration:.001s!important;animation-iteration-count:1!important;transition-duration:.001s!important}
+
+/* corner rounding — cubic at 0px (the default); softens with the slider */
+.nbtn,.sbtn,#omni,.st-tile,.st-search,.pbtn,.auth-go,.acc-row button,.auth-form input,
+.modal,.acc-modal,#menu,.toast,#findbar,.dl-btn,.err-card,#dialForm,#dialForm input,
+.seg button,.wall,.sug{border-radius:var(--radius)}
+.acc-me .av,#sAcct{border-radius:calc(var(--radius) * .55)}
+:root[data-round="full"] .acc-me .av,:root[data-round="full"] #sAcct{border-radius:50%;overflow:hidden}
+
 /* accent-driven touches (Opera-style single accent) */
 #omni:focus-within{border-color:var(--accent)}
 .sbtn.on::before{background:var(--accent)}
@@ -397,6 +422,19 @@ body{background-color:var(--bg);background-image:var(--wall,none);background-siz
 .sw{width:26px;height:26px;border-radius:50%;border:2px solid transparent;cursor:pointer;position:relative}
 .sw.on{border-color:var(--text)}
 .sw.on::after{content:'';position:absolute;inset:3px;border-radius:50%;border:2px solid var(--bg)}
+.sw-custom{background:conic-gradient(from 0deg,#f00,#ff0,#0f0,#0ff,#00f,#f0f,#f00);overflow:hidden;display:inline-flex}
+.sw-custom input{opacity:0;width:100%;height:100%;cursor:pointer;border:0;padding:0}
+/* colour rows + range slider (custom scheme) */
+.set-lbl{font-size:13px;font-weight:600}
+.col-side{display:flex;align-items:center;gap:8px}
+.col-in{width:30px;height:24px;padding:0;border:1px solid var(--line-2);background:none;cursor:pointer}
+.col-reset{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--dim);border:1px solid var(--line-3);padding:3px 8px;background:none}
+.col-reset:hover{color:var(--text);border-color:var(--line-2)}
+.rng-wrap{display:flex;align-items:center;gap:10px}
+.rng-wrap input[type=range]{-webkit-appearance:none;appearance:none;width:130px;height:14px;background:none;cursor:pointer}
+.rng-wrap input[type=range]::-webkit-slider-runnable-track{height:2px;background:var(--line-2)}
+.rng-wrap input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:12px;height:12px;background:var(--accent);margin-top:-5px}
+.rng-wrap b{font-size:11px;color:var(--dim);min-width:32px;text-align:right}
 .walls{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:6px 16px 14px}
 .wall{height:46px;border:1px solid var(--line);cursor:pointer;position:relative;overflow:hidden}
 .wall.on{border-color:var(--text);outline:1px solid var(--text)}
@@ -630,8 +668,17 @@ function save(k, v){ try { localStorage.setItem(k, JSON.stringify(v)); } catch {
 
 const settings = Object.assign({
   engine:'google', theme:'dark', restore:true, homepage:'', adblock:true, kpanel:false,
-  /* appearance / Opera-style customization */
-  mode:'dark', accent:'#1d9bf0', wallpaper:'', density:'cozy'
+  /* appearance — mirrors KONEKT's own settings, browser-applicable subset */
+  mode:'dark',          // dark | light | system | glass | custom
+  accent:'#1d9bf0',
+  wallpaper:'',
+  density:'cozy',       // cozy | compact
+  fs:'m',               // s | m | l  (interface scale)
+  caps:true,            // uppercase interface labels
+  radius:0,             // 0..24 corner rounding
+  avRound:false,        // round the account avatar
+  motion:true,          // false = reduce motion
+  bgCol:'', lineCol:'', textCol:''   // custom-scheme colours
 }, load('kb.settings', {}));
 /* migrate the old light/dark theme flag into the richer mode */
 if (!load('kb.settings', {}).mode && settings.theme) settings.mode = settings.theme === 'light' ? 'light' : 'dark';
@@ -1297,6 +1344,21 @@ document.addEventListener('click', e => {
 });
 
 /* ---------------------- settings ---------------------- */
+function colorRow(title, key, fallback){
+  const v = settings[key];
+  return '<div class="set-row"><span class="set-lbl">'+esc(title)+'</span>'
+    + '<span class="sr col-side">'
+    + (v ? '<button class="col-reset" data-colclear="'+key+'">Reset</button>' : '')
+    + '<input type="color" class="col-in" data-col="'+key+'" value="'+esc(v||fallback)+'"></span></div>';
+}
+function contrastNote(){
+  const bgc = settings.bgCol, txt = settings.textCol;
+  if (!bgc && !txt) return '';
+  const b = bgc || '#0a0b0d';
+  const tx = txt || (luma(b) > .5 ? '#000000' : '#ffffff');
+  if (Math.abs(luma(b) - luma(tx)) >= .4) return '';
+  return '<div class="set-note" style="color:var(--warn)">Low contrast — this text may be hard to read on this background.</div>';
+}
 async function openSettings(){
   const info = await bridge.info().catch(() => ({}));
   const eng = k => '<button class="set-row" data-eng="'+k+'">'+esc(ENGINES[k].n)
@@ -1307,15 +1369,33 @@ async function openSettings(){
     + '<div class="set-h">Account</div>'
     + '<button class="set-row" data-set="account">'+(account ? esc(account.name || ('@'+account.handle)) : 'Sign in or create account')
       + '<span class="sr">'+(account ? 'Signed in · syncing' : 'Sync across devices')+'</span></button>'
-    + '<div class="set-h">Appearance — Mode</div>'
-    + '<div class="seg" id="modeSeg">'
-      + ['dark','light','glass'].map(m => '<button data-mode="'+m+'"'+(settings.mode===m?' class="on"':'')+'>'
-        + (m==='glass'?'Liquid Glass':m[0].toUpperCase()+m.slice(1))+'</button>').join('')
+    + '<div class="set-h">Appearance — Colour scheme</div>'
+    + '<div class="seg">'
+      + [['dark','Dark'],['light','Light'],['system','System'],['glass','Glass'],['custom','Custom']]
+        .map(m => '<button data-mode="'+m[0]+'"'+(settings.mode===m[0]?' class="on"':'')+'>'+m[1]+'</button>').join('')
     + '</div>'
+    + (settings.mode === 'custom'
+        ? '<div class="set-h">Custom colours</div>'
+          + colorRow('Background','bgCol', settings.bgCol || (document.documentElement.dataset.theme==='light'?'#ffffff':'#0a0b0d'))
+          + colorRow('Outlines','lineCol', settings.lineCol || '#434343')
+          + colorRow('Text','textCol', settings.textCol || (document.documentElement.dataset.theme==='light'?'#000000':'#ffffff'))
+          + contrastNote()
+        : '')
     + '<div class="set-h">Accent</div>'
     + '<div class="swatches">'
-      + ACCENTS.map(c => '<span class="sw'+(String(settings.accent).toLowerCase()===c?' on':'')+'" data-accent="'+c+'" style="background:'+c+'"></span>').join('')
+      + ACCENTS.map(c => '<span class="sw'+(String(settings.accent).toLowerCase()===c.toLowerCase()?' on':'')+'" data-accent="'+c+'" style="background:'+c+'"></span>').join('')
+      + '<label class="sw sw-custom" title="Custom accent"><input type="color" data-col="accent" value="'+esc(settings.accent||'#1d9bf0')+'"></label>'
     + '</div>'
+    + '<div class="set-h">Text size</div>'
+    + '<div class="seg">'
+      + [['s','S'],['m','M'],['l','L']].map(f => '<button data-fs="'+f[0]+'"'+((settings.fs||'m')===f[0]?' class="on"':'')+'>'+f[1]+'</button>').join('')
+    + '</div>'
+    + '<div class="set-h">Shape</div>'
+    + '<div class="set-row"><span class="set-lbl">Corner rounding</span>'
+      + '<span class="sr rng-wrap"><input type="range" id="radRange" min="0" max="24" step="2" value="'+(parseInt(settings.radius,10)||0)+'"><b id="radVal">'+(parseInt(settings.radius,10)||0)+'px</b></span></div>'
+    + '<button class="set-row" data-set="avRound">Round avatar<span class="sr">'+(settings.avRound?'On':'Off')+'</span></button>'
+    + '<button class="set-row" data-set="caps">Uppercase interface<span class="sr">'+(settings.caps!==false?'On':'Off')+'</span></button>'
+    + '<button class="set-row" data-set="motion">Reduce motion<span class="sr">'+(settings.motion===false?'On':'Off')+'</span></button>'
     + '<div class="set-h">Wallpaper</div>'
     + '<div class="walls">'
       + Object.keys(WALLS).map(k => '<div class="wall'+((settings.wallpaper||'none')===k?' on':'')+'" data-wall="'+k+'" '
@@ -1323,6 +1403,7 @@ async function openSettings(){
     + '</div>'
     + '<div class="set-h">Layout</div>'
     + '<button class="set-row" data-set="density">Density<span class="sr">'+(settings.density==='compact'?'Compact':'Cozy')+'</span></button>'
+    + '<button class="set-row" data-set="resetapp">Reset appearance<span class="sr" style="color:var(--danger)">Reset</span></button>'
     + '<div class="set-h">On start</div>'
     + '<button class="set-row" data-set="restore">Reopen previous tabs<span class="sr">'+(settings.restore ? 'On' : 'Off')+'</span></button>'
     + '<div class="set-h">Privacy</div>'
@@ -1348,11 +1429,22 @@ $('#setBody').addEventListener('click', e => {
   if (accB){ settings.accent = accB.dataset.accent; applyTheme(); saveSettings(); openSettings(); return; }
   const wallB = e.target.closest('[data-wall]');
   if (wallB){ settings.wallpaper = wallB.dataset.wall === 'none' ? '' : wallB.dataset.wall; applyTheme(); saveSettings(); openSettings(); renderStart(); return; }
+  const fsB = e.target.closest('[data-fs]');
+  if (fsB){ settings.fs = fsB.dataset.fs; applyTheme(); saveSettings(); openSettings(); return; }
+  const clr = e.target.closest('[data-colclear]');
+  if (clr){ settings[clr.dataset.colclear] = ''; applyTheme(); saveSettings(); openSettings(); renderStart(); return; }
   const b = e.target.closest('[data-set]');
   if (!b) return;
   if (b.dataset.set === 'account'){ $('#shade').classList.remove('open'); openAccount(); return; }
   else if (b.dataset.set === 'update'){ checkUpdates(); return; }
   else if (b.dataset.set === 'density'){ settings.density = settings.density === 'compact' ? 'cozy' : 'compact'; applyTheme(); saveSettings(); openSettings(); }
+  else if (b.dataset.set === 'caps'){ settings.caps = settings.caps === false; applyTheme(); saveSettings(); openSettings(); }
+  else if (b.dataset.set === 'motion'){ settings.motion = settings.motion === false; applyTheme(); saveSettings(); openSettings(); }
+  else if (b.dataset.set === 'avRound'){ settings.avRound = !settings.avRound; applyTheme(); saveSettings(); openSettings(); }
+  else if (b.dataset.set === 'resetapp'){
+    Object.assign(settings, { mode:'dark', accent:'#1d9bf0', wallpaper:'', density:'cozy', fs:'m', caps:true, radius:0, avRound:false, motion:true, bgCol:'', lineCol:'', textCol:'' });
+    applyTheme(); saveSettings(); openSettings(); renderStart(); toast('Appearance reset');
+  }
   else if (b.dataset.set === 'theme'){ settings.mode = settings.mode === 'light' ? 'dark' : 'light'; applyTheme(); saveSettings(); openSettings(); }
   else if (b.dataset.set === 'adblock'){
     settings.adblock = settings.adblock === false;
@@ -1369,24 +1461,77 @@ $('#setBody').addEventListener('click', e => {
   }
 });
 $('#shade').addEventListener('click', e => { if (e.target === $('#shade')) $('#shade').classList.remove('open'); });
+/* live controls: corner-rounding slider + colour pickers (don't re-render mid-drag) */
+let colReRender = null;
+$('#setBody').addEventListener('input', e => {
+  if (e.target.id === 'radRange'){
+    settings.radius = parseInt(e.target.value, 10) || 0;
+    const v = $('#radVal'); if (v) v.textContent = settings.radius + 'px';
+    applyTheme(); saveSettings();
+    return;
+  }
+  const col = e.target.closest('[data-col]');
+  if (col){
+    const key = col.dataset.col;
+    settings[key] = e.target.value;
+    if (key !== 'accent' && settings.mode !== 'custom') settings.mode = 'custom';
+    applyTheme(); saveSettings(); renderStart();
+    /* refresh the panel once the user settles, so swatches/notes catch up */
+    clearTimeout(colReRender); colReRender = setTimeout(openSettings, 500);
+  }
+});
+/* colour maths — a custom background derives the greys so they stay legible */
+function hex2rgb(h){ const m = /^#?([0-9a-f]{6})$/i.exec(String(h||'').trim()); if(!m) return null; const n = parseInt(m[1],16); return [(n>>16)&255,(n>>8)&255,n&255]; }
+function rgb2hex(c){ return '#'+c.map(v => ('0'+Math.max(0,Math.min(255,Math.round(v))).toString(16)).slice(-2)).join(''); }
+function luma(h){ const c = hex2rgb(h); return c ? (0.2126*c[0]+0.7152*c[1]+0.0722*c[2])/255 : 0; }
+function mixHex(a,b,t){ const x=hex2rgb(a), y=hex2rgb(b); if(!x||!y) return a; return rgb2hex([0,1,2].map(i => x[i]+(y[i]-x[i])*t)); }
+function prefersLight(){ return window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches; }
+
 function applyTheme(){
-  const r = document.documentElement;
+  const r = document.documentElement, S = r.style;
   const mode = settings.mode || 'dark';
-  const light = mode === 'light';
-  r.dataset.theme = light ? 'light' : 'dark';
-  r.dataset.appearance = mode;                 // 'dark' | 'light' | 'glass'
+  ['--bg','--hover','--hover-2','--line','--line-2','--line-3','--text','--accent'].forEach(k => S.removeProperty(k));
+
+  let base;   // which built-in palette the greys follow
+  if (mode === 'custom'){
+    const bgc = settings.bgCol, ink = settings.textCol || (bgc && luma(bgc) > .5 ? '#000000' : '#ffffff');
+    base = bgc ? (luma(bgc) > .5 ? 'light' : 'dark') : (prefersLight() ? 'light' : 'dark');
+    if (bgc){ S.setProperty('--bg', bgc); S.setProperty('--hover', mixHex(bgc, ink, .06)); S.setProperty('--hover-2', mixHex(bgc, ink, .12)); }
+    if (settings.lineCol){ S.setProperty('--line', settings.lineCol); S.setProperty('--line-2', mixHex(settings.lineCol, ink, .35)); S.setProperty('--line-3', mixHex(settings.lineCol, bgc || (base==='light'?'#ffffff':'#0a0b0d'), .55)); }
+    if (settings.textCol) S.setProperty('--text', settings.textCol);
+  } else if (mode === 'system'){
+    base = prefersLight() ? 'light' : 'dark';
+  } else {
+    base = mode === 'light' ? 'light' : 'dark';   // dark | glass both use the dark palette
+  }
+  r.dataset.theme = base;
+  r.dataset.appearance = mode;                 // dark | light | system | glass | custom
+  S.setProperty('--accent', settings.accent || '#1d9bf0');
+
   r.dataset.density = settings.density || 'cozy';
-  r.style.setProperty('--accent', settings.accent || '#1d9bf0');
-  /* wallpaper: an explicit preset, or a default for glass so there's always
-     something for the frost to refract */
+  r.dataset.fs = settings.fs || 'm';
+  r.dataset.caps = settings.caps === false ? 'off' : 'on';
+  r.dataset.motion = settings.motion === false ? 'off' : 'on';
+  r.dataset.round = settings.avRound ? 'full' : 'square';
+  S.setProperty('--radius', (Math.max(0, Math.min(24, parseInt(settings.radius,10)||0))) + 'px');
+
+  /* wallpaper: an explicit preset, or a default for glass so the frost has
+     something to refract */
   let wall = settings.wallpaper && WALLS[settings.wallpaper] !== undefined ? WALLS[settings.wallpaper]
            : (settings.wallpaper && /url\(|gradient|#|http/.test(settings.wallpaper) ? settings.wallpaper : '');
   if (!wall && mode === 'glass') wall = WALLS.aurora;
-  r.style.setProperty('--wall', wall || 'none');
+  S.setProperty('--wall', wall || 'none');
   r.dataset.wallOn = wall ? '1' : '0';
-  settings.theme = light ? 'light' : 'dark';   // keep the legacy flag in step
-  bridge.send('set-theme', { dark: !light });
+
+  settings.theme = base;                        // keep the legacy flag in step
+  bridge.send('set-theme', { dark: base !== 'light' });
   bridge.send('set-material', { glass: mode === 'glass' });
+}
+/* follow the OS when the scheme is System */
+if (window.matchMedia){
+  const mq = window.matchMedia('(prefers-color-scheme: light)');
+  const on = () => { if (settings.mode === 'system' || settings.mode === 'custom') applyTheme(); };
+  if (mq.addEventListener) mq.addEventListener('change', on);
 }
 
 /* ---------------------- permission prompts ---------------------- */
@@ -1606,7 +1751,9 @@ function collectData(){
     history: history.slice(-1200),
     dials: dials,
     settings: { engine: settings.engine, restore: settings.restore, adblock: settings.adblock, homepage: settings.homepage },
-    appearance: { mode: settings.mode, accent: settings.accent, wallpaper: settings.wallpaper, density: settings.density }
+    appearance: { mode: settings.mode, accent: settings.accent, wallpaper: settings.wallpaper, density: settings.density,
+                  fs: settings.fs, caps: settings.caps, radius: settings.radius, avRound: settings.avRound,
+                  motion: settings.motion, bgCol: settings.bgCol, lineCol: settings.lineCol, textCol: settings.textCol }
   };
 }
 function mergeIn(d){
@@ -1631,7 +1778,8 @@ function mergeIn(d){
     ['engine','restore','adblock','homepage'].forEach(k => { if (d.settings[k] !== undefined) settings[k] = d.settings[k]; });
   }
   if (d.appearance && typeof d.appearance === 'object'){
-    ['mode','accent','wallpaper','density'].forEach(k => { if (d.appearance[k] !== undefined) settings[k] = d.appearance[k]; });
+    ['mode','accent','wallpaper','density','fs','caps','radius','avRound','motion','bgCol','lineCol','textCol']
+      .forEach(k => { if (d.appearance[k] !== undefined) settings[k] = d.appearance[k]; });
   }
   saveSettings();
 }
@@ -1824,6 +1972,8 @@ window.KB = {
   newTab,
   adblockState(){ return { on: settings.adblock !== false, blocked: adCount }; },
   smokeGlass(){ settings.mode = 'glass'; settings.accent = '#a970ff'; applyTheme(); navigate(AT(), START); },
+  smokeCustom(){ Object.assign(settings, { mode:'custom', bgCol:'#0d1b2a', lineCol:'#2a4a6b', textCol:'#eaf2ff', accent:'#00ba7c', radius:12, wallpaper:'', fs:'m' }); applyTheme(); navigate(AT(), START); },
+  smokeSettingsAppearance(){ openSettings(); },
   smokeAccount(){ openAccount(); },
   smokeSettings(){ openSettings(); },
   appearanceState(){ return { mode: settings.mode, accent: settings.accent, wallpaper: settings.wallpaper, density: settings.density, hasAccount: !!account }; },
