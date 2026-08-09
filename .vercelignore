@@ -1,4 +1,9 @@
 *
 !site
 !site/**
+!api
+!api/**
+!lib
+!lib/**
+!package.json
 !vercel.json
