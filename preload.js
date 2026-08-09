@@ -15,6 +15,7 @@ const SEND = new Set([
   'set-material',    // { glass } — Windows acrylic for Liquid Glass mode
   'clear-data',      // wipe cookies/storage/cache of the web partition
   'adblock-set',     // { on } — toggle the built-in ad/tracker blocker
+  'self-update',     // { url } — download + swap + relaunch (portable build)
   'chrome-ready'     // chrome finished booting (smoke mode waits for this)
 ]);
 const ON = new Set([
@@ -24,7 +25,8 @@ const ON = new Set([
   'dl',              // download lifecycle events
   'perm-request',    // { id, origin, permission }
   'fullscreen',      // (bool) window fullscreen state changed
-  'adblock-count'    // running total of blocked requests this session
+  'adblock-count',   // running total of blocked requests this session
+  'update-progress'  // { phase, pct } — self-update lifecycle
 ]);
 
 contextBridge.exposeInMainWorld('konektBridge', {

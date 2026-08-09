@@ -42,6 +42,22 @@ The browser now mirrors KONEKT's own appearance settings:
   **density**, and the six **wallpapers**. Everything syncs across devices and a
   **Reset appearance** returns to the original KONEKT look.
 
+### New in 1.3
+
+- **Pinboard HUD** — the new-tab page is a drag-and-resize widget board (snap
+  grid). Widgets: clock, search, Speed Dial, live **weather** (Open-Meteo),
+  **news** (Hacker News), **markets** (CoinGecko), notes, bookmarks, reading
+  list. Enable/arrange in *Edit board*; layout syncs to your account. No API keys.
+- **RGB colour wheel** — a real HSV wheel + brightness for accent and custom
+  colours, on desktop (canvas) and Android (native view).
+- **Geek theme** — a `cmatrix` rain background with typed-out text, phosphor green.
+- **Custom wallpaper** — paste an image, GIF, or looping MP4/WEBM URL.
+- **Self-update on both platforms** — checks GitHub on every launch; if a newer
+  version exists it asks, then downloads and installs in place (desktop swaps the
+  portable folder and relaunches; Android opens the packaged installer).
+- **Left slide-out menu** on desktop, plus reading list, screenshot, translate
+  and copy-link. Sync merges per-key, so a phone push never clobbers desktop HUD.
+
 ## Run it
 
 Double-click **`KONEKT Browser.cmd`** — or from a terminal:

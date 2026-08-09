@@ -234,6 +234,7 @@ public class BrowserActivity extends Activity {
     restoreSession();
     if (tabs.isEmpty()) newTab(START, false);
     if (intentUrl != null) newTab(intentUrl, false);
+    ui.postDelayed(() -> checkUpdates(true), 2500);   // silent check for a new version on launch
   }
 
   Icon navIcon(int type, View.OnClickListener fn) {
@@ -761,7 +762,7 @@ public class BrowserActivity extends Activity {
 
     body.addView(label("MODE"));
     LinearLayout seg = new LinearLayout(this); seg.setOrientation(LinearLayout.HORIZONTAL); seg.setPadding(dp(14), 0, dp(14), dp(6));
-    String[][] modes = {{"dark","Dark"},{"light","Light"},{"system","System"},{"glass","Glass"}};
+    String[][] modes = {{"dark","Dark"},{"light","Light"},{"system","System"},{"glass","Glass"},{"geek","Geek"}};
     for (String[] m : modes) {
       final String key = m[0];
       TextView bt = new TextView(this); bt.setText(m[1]); bt.setGravity(Gravity.CENTER); bt.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11);
@@ -826,6 +827,14 @@ public class BrowserActivity extends Activity {
       dot.setOnClickListener(v -> { prefs.edit().putString("accent", c).apply(); applyAppearance(); showCustomize(); schedulePush(); });
       sw.addView(dot);
     }
+    // custom accent via the RGB colour wheel
+    View acw = new View(this);
+    GradientDrawable ag = new GradientDrawable(); ag.setShape(GradientDrawable.OVAL); ag.setGradientType(GradientDrawable.SWEEP_GRADIENT);
+    ag.setColors(new int[]{0xFFFF0000,0xFFFFFF00,0xFF00FF00,0xFF00FFFF,0xFF0000FF,0xFFFF00FF,0xFFFF0000});
+    acw.setBackground(ag);
+    LinearLayout.LayoutParams acwlp = new LinearLayout.LayoutParams(dp(28), dp(28)); acw.setLayoutParams(acwlp);
+    acw.setOnClickListener(v -> openColorWheel(ACCENT, c -> { prefs.edit().putString("accent", String.format("#%06X", c & 0xFFFFFF)).apply(); applyAppearance(); showCustomize(); schedulePush(); }));
+    sw.addView(acw);
     body.addView(sw);
 
     // Custom background — picking one switches the scheme to Custom and derives the palette
@@ -850,6 +859,14 @@ public class BrowserActivity extends Activity {
       });
       bgs.addView(dot);
     }
+    // custom background via the RGB colour wheel
+    View bcw = new View(this);
+    GradientDrawable bgw = new GradientDrawable(); bgw.setShape(GradientDrawable.OVAL); bgw.setGradientType(GradientDrawable.SWEEP_GRADIENT);
+    bgw.setColors(new int[]{0xFFFF0000,0xFFFFFF00,0xFF00FF00,0xFF00FFFF,0xFF0000FF,0xFFFF00FF,0xFFFF0000});
+    bcw.setBackground(bgw);
+    LinearLayout.LayoutParams bcwlp = new LinearLayout.LayoutParams(dp(28), dp(28)); bcw.setLayoutParams(bcwlp);
+    bcw.setOnClickListener(v -> openColorWheel(parseColor(prefs.getString("bgCol", "#0a0b0d"), 0xFF0A0B0D), c -> { prefs.edit().putString("mode", "custom").putString("bgCol", String.format("#%06X", c & 0xFFFFFF)).apply(); applyAppearance(); showCustomize(); schedulePush(); }));
+    bgs.addView(bcw);
     body.addView(bgs);
 
     body.addView(label("WALLPAPER"));
@@ -1061,8 +1078,10 @@ public class BrowserActivity extends Activity {
     new Thread(() -> { try { http("PUT", API_BASE + "/api/sync", token, payload); } catch (Exception ignored) {} }).start();
   }
 
-  void checkUpdates() {
-    Toast.makeText(this, "Checking for updates…", Toast.LENGTH_SHORT).show();
+  boolean pendingInstall = false;
+  void checkUpdates() { checkUpdates(false); }
+  void checkUpdates(final boolean silent) {
+    if (!silent) Toast.makeText(this, "Checking for updates…", Toast.LENGTH_SHORT).show();
     new Thread(() -> {
       try {
         String resp = http("GET", "https://api.github.com/repos/" + REPO + "/releases/latest", null, null);
@@ -1072,15 +1091,54 @@ public class BrowserActivity extends Activity {
         ui.post(() -> {
           if (isNewer(latest, cur)) {
             new AlertDialog.Builder(this).setTitle("Update available")
-              .setMessage("Version " + latest + " is available (you have " + cur + ").")
-              .setPositiveButton("Get it", (d, x) -> newTab(RELEASES, false))
+              .setMessage("KONEKT Browser " + latest + " is available (you have " + cur + ").\n\nUpdate now? It'll download and open the installer.")
+              .setPositiveButton("Update now", (d, x) -> startUpdate())
               .setNegativeButton("Later", null).show();
-          } else {
+          } else if (!silent) {
             Toast.makeText(this, "You're on the latest version (" + cur + ")", Toast.LENGTH_LONG).show();
           }
         });
-      } catch (Exception e) { ui.post(() -> Toast.makeText(this, "Couldn't check for updates", Toast.LENGTH_SHORT).show()); }
+      } catch (Exception e) { if (!silent) ui.post(() -> Toast.makeText(this, "Couldn't check for updates", Toast.LENGTH_SHORT).show()); }
     }).start();
+  }
+  void startUpdate() {
+    Toast.makeText(this, "Downloading update…", Toast.LENGTH_SHORT).show();
+    new Thread(() -> {
+      try {
+        String cur = "https://github.com/" + REPO + "/releases/latest/download/KONEKT-Browser-android.apk";
+        HttpURLConnection c = null; java.io.InputStream in = null;
+        for (int redir = 0; redir < 6; redir++) {
+          c = (HttpURLConnection) new URL(cur).openConnection();
+          c.setInstanceFollowRedirects(false); c.setConnectTimeout(15000); c.setReadTimeout(45000);
+          c.setRequestProperty("User-Agent", "KONEKT-Browser-Android");
+          int code = c.getResponseCode();
+          if (code >= 300 && code < 400) { cur = c.getHeaderField("Location"); c.disconnect(); continue; }
+          in = c.getInputStream(); break;
+        }
+        if (in == null) throw new Exception("no stream");
+        java.io.FileOutputStream fo = new java.io.FileOutputStream(ApkProvider.file(this));
+        byte[] buf = new byte[16384]; int n; while ((n = in.read(buf)) > 0) fo.write(buf, 0, n);
+        fo.close(); in.close();
+        ui.post(this::installApk);
+      } catch (Exception e) { ui.post(() -> Toast.makeText(this, "Download failed", Toast.LENGTH_SHORT).show()); }
+    }).start();
+  }
+  void installApk() {
+    if (Build.VERSION.SDK_INT >= 26 && !getPackageManager().canRequestPackageInstalls()) {
+      pendingInstall = true;
+      Toast.makeText(this, "Allow installing apps for KONEKT Browser, then it continues", Toast.LENGTH_LONG).show();
+      try { startActivity(new Intent(android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:" + getPackageName()))); }
+      catch (Exception e) { try { startActivity(new Intent(android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES)); } catch (Exception e2) {} }
+      return;
+    }
+    pendingInstall = false;
+    try {
+      Uri uri = Uri.parse("content://network.konekt.browser.apk/" + ApkProvider.NAME);
+      Intent i = new Intent(Intent.ACTION_VIEW);
+      i.setDataAndType(uri, "application/vnd.android.package-archive");
+      i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_GRANT_READ_URI_PERMISSION);
+      startActivity(i);
+    } catch (Exception e) { Toast.makeText(this, "Install failed", Toast.LENGTH_SHORT).show(); }
   }
   boolean isNewer(String a, String b) {
     int[] A = ver(a), B = ver(b);
@@ -1131,9 +1189,71 @@ public class BrowserActivity extends Activity {
     else if (req == 72 && mediaReq != null) { boolean all = grants.length > 0; for (int g : grants) if (g != PackageManager.PERMISSION_GRANTED) all = false; if (all) mediaReq.grant(mediaReq.getResources()); else mediaReq.deny(); mediaReq = null; }
   }
   @Override protected void onPause() { super.onPause(); saveSession(); CookieManager.getInstance().flush(); Tab t = at(); if (t != null && t.wv != null) t.wv.onPause(); }
-  @Override protected void onResume() { super.onResume(); Tab t = at(); if (t != null && t.wv != null) t.wv.onResume(); }
+  @Override protected void onResume() { super.onResume(); Tab t = at(); if (t != null && t.wv != null) t.wv.onResume();
+    if (pendingInstall && (Build.VERSION.SDK_INT < 26 || getPackageManager().canRequestPackageInstalls())) { pendingInstall = false; ui.postDelayed(this::installApk, 400); } }
 
   /* ================================================================ stroke icons */
+  /* ================================================================ RGB / HSV colour wheel */
+  interface OnColor { void onColor(int c); }
+  static class ColorWheelView extends View {
+    android.graphics.Bitmap bmp; float hue = 0, sat = 1, val = 1; int size = 0;
+    OnColor cb;
+    final Paint mark = new Paint(Paint.ANTI_ALIAS_FLAG);
+    ColorWheelView(Context c) { super(c); mark.setStyle(Paint.Style.STROKE); mark.setStrokeWidth(3.5f); }
+    int color() { return Color.HSVToColor(new float[]{ hue, sat, val }); }
+    void setColor(int col) { float[] h = new float[3]; Color.colorToHSV(col, h); hue = h[0]; sat = h[1]; val = h[2]; rebuild(); invalidate(); }
+    void setValue(float v) { val = v; rebuild(); invalidate(); if (cb != null) cb.onColor(color()); }
+    @Override protected void onSizeChanged(int w, int h, int ow, int oh) { size = Math.min(w, h); rebuild(); }
+    void rebuild() {
+      if (size <= 0) return;
+      int R = size / 2; float cx = R, cy = R; int[] px = new int[size * size];
+      float[] hsv = new float[]{ 0, 0, val };
+      for (int y = 0; y < size; y++) for (int x = 0; x < size; x++) {
+        float dx = x - cx, dy = y - cy; double dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist <= R) { float hh = (float) (Math.atan2(dy, dx) * 180 / Math.PI); if (hh < 0) hh += 360;
+          hsv[0] = hh; hsv[1] = (float) Math.min(1, dist / R); px[y * size + x] = Color.HSVToColor(hsv); }
+        else px[y * size + x] = 0;
+      }
+      bmp = android.graphics.Bitmap.createBitmap(px, size, size, android.graphics.Bitmap.Config.ARGB_8888);
+    }
+    @Override protected void onDraw(Canvas c) {
+      if (bmp != null) c.drawBitmap(bmp, 0, 0, null);
+      int R = size / 2; float mr = sat * R, mx = R + (float) Math.cos(Math.toRadians(hue)) * mr, my = R + (float) Math.sin(Math.toRadians(hue)) * mr;
+      mark.setColor(0xFF000000); c.drawCircle(mx, my, 9, mark); mark.setColor(0xFFFFFFFF); c.drawCircle(mx, my, 7, mark);
+    }
+    @Override public boolean onTouchEvent(MotionEvent e) {
+      int R = size / 2; float dx = e.getX() - R, dy = e.getY() - R; double dist = Math.sqrt(dx * dx + dy * dy); if (dist > R) dist = R;
+      sat = (float) (dist / R); float hh = (float) (Math.atan2(dy, dx) * 180 / Math.PI); if (hh < 0) hh += 360; hue = hh;
+      invalidate(); if (cb != null) cb.onColor(color());
+      if (getParent() != null) getParent().requestDisallowInterceptTouchEvent(true);
+      return true;
+    }
+  }
+  void openColorWheel(int initial, final OnColor onFinal) {
+    LinearLayout box = new LinearLayout(this); box.setOrientation(LinearLayout.VERTICAL); box.setPadding(dp(20), dp(18), dp(20), dp(6));
+    final ColorWheelView wheel = new ColorWheelView(this);
+    int sz = dp(230); LinearLayout.LayoutParams wlp = new LinearLayout.LayoutParams(sz, sz); wlp.gravity = Gravity.CENTER_HORIZONTAL; wheel.setLayoutParams(wlp);
+    box.addView(wheel);
+    final android.widget.SeekBar bright = new android.widget.SeekBar(this); bright.setMax(100);
+    LinearLayout.LayoutParams blp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT); blp.setMargins(0, dp(14), 0, dp(8)); bright.setLayoutParams(blp);
+    box.addView(bright);
+    LinearLayout foot = new LinearLayout(this); foot.setOrientation(LinearLayout.HORIZONTAL); foot.setGravity(Gravity.CENTER_VERTICAL);
+    final View swatch = new View(this); swatch.setLayoutParams(new LinearLayout.LayoutParams(dp(30), dp(30)));
+    final TextView hexTv = new TextView(this); hexTv.setTextColor(TEXT); hexTv.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14); hexTv.setPadding(dp(12), 0, 0, 0); hexTv.setTypeface(Typeface.MONOSPACE);
+    foot.addView(swatch); foot.addView(hexTv); box.addView(foot);
+    wheel.cb = c -> { swatch.setBackgroundColor(c); hexTv.setText(String.format("#%06X", c & 0xFFFFFF)); };
+    wheel.setColor(initial);
+    float[] hh = new float[3]; Color.colorToHSV(initial, hh); bright.setProgress(Math.round(hh[2] * 100));
+    swatch.setBackgroundColor(initial); hexTv.setText(String.format("#%06X", initial & 0xFFFFFF));
+    bright.setOnSeekBarChangeListener(new android.widget.SeekBar.OnSeekBarChangeListener() {
+      public void onProgressChanged(android.widget.SeekBar s, int p, boolean u) { wheel.setValue(p / 100f); }
+      public void onStartTrackingTouch(android.widget.SeekBar s) {} public void onStopTrackingTouch(android.widget.SeekBar s) {}
+    });
+    new AlertDialog.Builder(this).setTitle("Colour").setView(box)
+      .setPositiveButton("Use", (d, x) -> onFinal.onColor(wheel.color()))
+      .setNegativeButton("Cancel", null).show();
+  }
+
   static class Icon extends View {
     static final int BACK = 0, FWD = 1, GLOBE = 2, TABS = 3, MENU = 4, X = 5, RELOAD = 6, LOCK = 7, UNLOCK = 8, PERSON = 9, PERSON_ON = 10;
     int type; int count = 0; int col = 0xFFD8D8D8;

@@ -9,7 +9,7 @@
    keyboard chords that have to win even when a page has focus.
    ================================================================ */
 'use strict';
-const { app, BrowserWindow, ipcMain, session, shell, Menu, clipboard } = require('electron');
+const { app, BrowserWindow, ipcMain, session, shell, Menu, clipboard, net } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
@@ -244,6 +244,7 @@ ipcMain.on('dl-action', (_e, { id, action }) => {
     else if (action === 'cancel') item.cancel();
   } catch {}
 });
+ipcMain.on('clip-write', (_e, s) => { if (typeof s === 'string') clipboard.writeText(s); });
 ipcMain.on('shell-show', (_e, p) => { if (typeof p === 'string') shell.showItemInFolder(p); });
 ipcMain.on('shell-open', (_e, p) => { if (typeof p === 'string') shell.openPath(p); });
 ipcMain.on('win-fullscreen', () => { if (win) win.setFullScreen(!win.isFullScreen()); });
@@ -264,6 +265,53 @@ ipcMain.on('set-material', (_e, { glass }) => {
     if (typeof win.setBackgroundMaterial === 'function') win.setBackgroundMaterial(glass ? 'acrylic' : 'none');
   } catch {}
 });
+/* ---------- self-update (portable build) ----------
+   Download the release zip, extract it, and hand off to a tiny .cmd
+   that waits for this process to exit, copies the new files over the
+   install folder, and relaunches. Dev runs just open the page. */
+ipcMain.on('self-update', (_e, { url }) => {
+  if (!app.isPackaged) { shell.openExternal('https://github.com/vapesnuseu-cmyk/konekt-browser/releases/latest'); return; }
+  try {
+    const tmp = path.join(app.getPath('temp'), 'konekt-update-' + process.pid);
+    fs.rmSync(tmp, { recursive: true, force: true }); fs.mkdirSync(tmp, { recursive: true });
+    const zipPath = path.join(tmp, 'update.zip');
+    const file = fs.createWriteStream(zipPath);
+    const req = net.request(url);
+    req.on('response', res => {
+      const total = parseInt(res.headers['content-length'] || 0, 10); let got = 0;
+      res.on('data', c => { got += c.length; file.write(c); if (total) send('update-progress', { phase: 'download', pct: Math.round(got / total * 100) }); });
+      res.on('end', () => file.end(() => extractAndSwap(tmp, zipPath)));
+    });
+    req.on('error', e => send('update-progress', { phase: 'error', error: String(e && e.message || e) }));
+    req.end();
+  } catch (e) { send('update-progress', { phase: 'error', error: String(e && e.message || e) }); }
+});
+function extractAndSwap(tmp, zipPath) {
+  send('update-progress', { phase: 'extract' });
+  const { spawn } = require('child_process');
+  const ps = spawn('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command',
+    'Expand-Archive -LiteralPath ' + JSON.stringify(zipPath) + ' -DestinationPath ' + JSON.stringify(tmp) + ' -Force'], { windowsHide: true });
+  ps.on('exit', code => {
+    if (code !== 0) { send('update-progress', { phase: 'error', error: 'Extraction failed' }); return; }
+    const installDir = path.dirname(process.execPath);
+    const newDir = path.join(tmp, 'KONEKT-Browser-win-x64');
+    if (!fs.existsSync(newDir)) { send('update-progress', { phase: 'error', error: 'Unexpected archive layout' }); return; }
+    const cmdPath = path.join(tmp, 'apply-update.cmd');
+    const pid = process.pid;
+    const cmd = '@echo off\r\n'
+      + ':wait\r\n'
+      + 'tasklist /fi "PID eq ' + pid + '" | find "' + pid + '" >nul && (timeout /t 1 /nobreak >nul & goto wait)\r\n'
+      + 'robocopy ' + q(newDir) + ' ' + q(installDir) + ' /E /IS /IT /R:2 /W:1 /NFL /NDL /NJH /NJS >nul\r\n'
+      + 'start "" ' + q(path.join(installDir, path.basename(process.execPath))) + '\r\n'
+      + 'timeout /t 2 /nobreak >nul\r\n'
+      + 'rmdir /s /q ' + q(tmp) + '\r\n';
+    fs.writeFileSync(cmdPath, cmd);
+    send('update-progress', { phase: 'swap' });
+    spawn('cmd.exe', ['/c', 'start', '""', '/min', cmdPath], { detached: true, stdio: 'ignore', windowsHide: true }).unref();
+    setTimeout(() => app.quit(), 600);
+  });
+}
+function q(s) { return '"' + s + '"'; }
 ipcMain.on('clear-data', async () => {
   const s = session.fromPartition(PARTITION);
   await s.clearStorageData();
@@ -276,7 +324,8 @@ ipcMain.handle('app-info', () => ({
   chrome: process.versions.chrome,
   node: process.versions.node,
   downloads: app.getPath('downloads'),
-  ua: CLEAN_UA
+  ua: CLEAN_UA,
+  isPackaged: app.isPackaged
 }));
 let chromeReady = false;
 ipcMain.on('chrome-ready', () => { chromeReady = true; });
@@ -396,6 +445,20 @@ async function runSmoke() {
     fs.writeFileSync(path.join(smokeDir, 'smoke-appearance.png'),
       (await win.webContents.capturePage()).toPNG());
     await win.webContents.executeJavaScript('$("#shade").classList.remove("open"), undefined');
+
+    /* left slide-out drawer */
+    await win.webContents.executeJavaScript('settings.mode="dark",applyTheme(),openDrawer(),undefined');
+    await delay(500);
+    fs.writeFileSync(path.join(smokeDir, 'smoke-drawer.png'),
+      (await win.webContents.capturePage()).toPNG());
+    await win.webContents.executeJavaScript('closeDrawer(), undefined');
+
+    /* Geek effect — matrix rain + typed text */
+    await win.webContents.executeJavaScript('KB.smokeGeek(), undefined');
+    await delay(1800);
+    fs.writeFileSync(path.join(smokeDir, 'smoke-geek.png'),
+      (await win.webContents.capturePage()).toPNG());
+    await win.webContents.executeJavaScript('settings.mode="dark",applyTheme(),undefined');
 
     /* account modal (sign in / create) */
     await win.webContents.executeJavaScript('kpanelToggle(false), KB.smokeAccount(), undefined');

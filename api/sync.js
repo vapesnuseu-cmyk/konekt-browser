@@ -4,7 +4,19 @@
 'use strict';
 const { redis, parse, userFromReq, cors, ok, fail, readBody } = require('../lib/kb.js');
 
-const MAX = 700 * 1024; // guard the blob size
+const MAX = 900 * 1024; // guard the blob size
+
+/* merge incoming into existing, two levels deep. Each device only sends the
+   keys it manages, so a phone push never wipes the desktop's HUD (and vice
+   versa). Arrays and scalars are replaced; plain objects merge one level. */
+const isObj = v => v && typeof v === 'object' && !Array.isArray(v);
+function merge2(base, add) {
+  const out = Object.assign({}, base);
+  for (const k of Object.keys(add || {})) {
+    out[k] = (isObj(out[k]) && isObj(add[k])) ? Object.assign({}, out[k], add[k]) : add[k];
+  }
+  return out;
+}
 
 module.exports = async function handler(req, res) {
   cors(res);
@@ -26,8 +38,9 @@ module.exports = async function handler(req, res) {
       const data = b && typeof b.data === 'object' && b.data ? b.data : {};
       const s = JSON.stringify(data);
       if (s.length > MAX) return fail(res, 413, 'Too much data to sync');
-      const prev = parse(await redis(['GET', key])) || { ver: 0 };
-      const rec = { data, ver: (prev.ver || 0) + 1, updated: Date.now() };
+      const prev = parse(await redis(['GET', key])) || { ver: 0, data: {} };
+      const merged = b.replace ? data : merge2(prev.data || {}, data);
+      const rec = { data: merged, ver: (prev.ver || 0) + 1, updated: Date.now() };
       await redis(['SET', key, JSON.stringify(rec)]);
       return ok(res, { ver: rec.ver, updated: rec.updated });
     }
