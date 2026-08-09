@@ -11,9 +11,22 @@ Two builds, one design language:
 - **Desktop** (`main.js` + `browser.html`): Chromium via Electron, so every site
   renders exactly as in Chrome. The chrome is one file, KONEKT-style.
 - **Android** (`android/`): a framework-only native app (no Gradle, no androidx)
-  around the system WebView — tabs, a thumb-friendly bottom bar, the Speed Dial
-  start page, the same ad blocker. Tiny APK (≈60 KB) because the engine is the
-  OS WebView. Build with `scripts/build-android.ps1` → `dist/KONEKT-Browser-android.apk`.
+  around the system WebView — tabs, a thumb-first **bottom** bar (address + lock +
+  reload down low, five-icon nav, everything else in the menu), the Speed Dial
+  start page, the same ad blocker. Tiny APK because the engine is the OS WebView.
+  Build with `scripts/build-android.ps1` → `dist/KONEKT-Browser-android.apk`.
+
+### New in 1.1
+
+- **Accounts + sync** — create a KONEKT Browser account (own backend: Vercel
+  functions in `api/`, `lib/kb.js`, on the same Upstash Redis as KONEKT, keys
+  namespaced `kb:`). Bookmarks, Speed Dial, history and settings sync across
+  desktop and phone. Bearer-token auth; passwords are PBKDF2-SHA512.
+- **Customisation** — Dark / Light / **Liquid Glass** modes, seven accent
+  colours, six wallpapers. Desktop uses Windows 11 acrylic behind frosted chrome;
+  Android uses a translucent theme. Compact layout density on desktop.
+- **In-app updates** — Settings → *Check for updates* compares your build to the
+  latest GitHub release and links straight to the download.
 
 ## Run it
 

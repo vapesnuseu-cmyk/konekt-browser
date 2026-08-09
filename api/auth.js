@@ -68,8 +68,6 @@ module.exports = async function handler(req, res) {
 
     return fail(res, 400, 'Unknown action');
   } catch (e) {
-    const msg = String(e && e.message || e);
-    if (process.env.KB_DEBUG === '1') return fail(res, 500, 'DBG:' + msg);
-    return fail(res, 500, /not-configured/.test(msg) ? 'Storage is not configured' : 'Server error');
+    return fail(res, 500, /not-configured/.test(String(e && e.message)) ? 'Storage is not configured' : 'Server error');
   }
 };

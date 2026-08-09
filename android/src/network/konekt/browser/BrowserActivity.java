@@ -3,10 +3,12 @@
    NKO Intl. Foundation of Technological Research & Development
 
    One Activity, framework-only (no androidx, no dependencies).
-   Tabs are android.webkit.WebViews; the chrome is built in code in
-   the KONEKT design language: black, cubic, thin strokes. Bottom
-   toolbar for thumbs, Speed Dial start page from assets, the same
-   domain-level ad blocker as the desktop build.
+   Tabs are android.webkit.WebViews. The chrome is built in code in
+   the KONEKT design language and lives at the BOTTOM, thumb-first
+   (Opera-mobile style): an address row and a five-icon nav row, with
+   almost everything else folded into the menu. Fully customisable
+   (mode / accent / wallpaper), account-synced, and self-updating
+   from the GitHub release.
    ================================================================ */
 package network.konekt.browser;
 
@@ -23,10 +25,13 @@ import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.RectF;
 import android.graphics.Typeface;
+import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
+import android.os.Handler;
+import android.os.Looper;
 import android.os.Message;
 import android.text.InputType;
 import android.util.TypedValue;
@@ -53,7 +58,6 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.EditText;
 import android.widget.FrameLayout;
-import android.widget.HorizontalScrollView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
@@ -63,24 +67,28 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.ByteArrayInputStream;
+import java.io.OutputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
-import java.util.Set;
 
 public class BrowserActivity extends Activity {
 
-  /* ------- KONEKT design tokens ------- */
-  static final int BG = 0xFF000000, HOVER2 = 0xFF141414;
-  static final int LINE = 0xFF434343, LINE2 = 0xFF666666, LINE3 = 0xFF232323;
-  static final int TEXT = 0xFFFFFFFF, DIM = 0xFF999999, DIM2 = 0xFF6F6F6F;
-  static final int ACCENT = 0xFF1D9BF0, WARN = 0xFFFFD400;
+  /* ------- palette (swapped live by appearance mode) ------- */
+  int BG = 0xFF000000, BAR = 0xFF000000, HOVER2 = 0xFF141414;
+  int LINE = 0xFF434343, LINE2 = 0xFF666666, LINE3 = 0xFF232323;
+  int TEXT = 0xFFFFFFFF, DIM = 0xFF999999, DIM2 = 0xFF6F6F6F;
+  int ACCENT = 0xFF1D9BF0;
+  boolean glass = false;
 
   static final String START = "file:///android_asset/start.html";
   static final String KONEKT_URL = "https://konekt-tawny.vercel.app";
+  static final String API_BASE = "https://konekt-browser.vercel.app";
+  static final String REPO = "vapesnuseu-cmyk/konekt-browser";
+  static final String RELEASES = "https://github.com/" + REPO + "/releases/latest";
 
   static final String[] ADBLOCK = {
     "doubleclick.net","googlesyndication.com","googleadservices.com","adservice.google.com",
@@ -98,39 +106,46 @@ public class BrowserActivity extends Activity {
     {"bing","Bing","https://www.bing.com/search?q="},
     {"yandex","Yandex","https://yandex.com/search/?text="}};
 
+  static final String[] ACCENTS = {"#1d9bf0","#00ba7c","#f91880","#ffd400","#a970ff","#ff6a00","#ffffff"};
+  static final String[][] WALLS = {
+    {"none","None"},{"aurora","Aurora"},{"ember","Ember"},{"mono","Mono"},{"teal","Teal"},{"violet","Violet"}};
+
   class Tab { WebView wv; String url = START; String title = "Speed Dial"; boolean desktop = false; }
 
   final List<Tab> tabs = new ArrayList<>();
   int cur = -1;
 
   FrameLayout root, container, fsHolder;
-  LinearLayout topBar, bottomBar, tabSheet, menuSheet;
-  ScrollView tabScroll;
+  LinearLayout bottomWrap, addrRow, navRow, sheet;
   EditText addr;
-  Icon secIc, backB, fwdB, tabsB;
-  View progress;
+  Icon lockIc, reloadIc, backB, fwdB, tabsB, acctB, menuB;
+  View progress, addrRowLine, navRowLine;
   SharedPreferences prefs;
 
   boolean adblockOn = true;
   long adBlocked = 0;
   String defaultUA;
+  final Handler ui = new Handler(Looper.getMainLooper());
 
   View customView; WebChromeClient.CustomViewCallback customCb;
   ValueCallback<Uri[]> fileCb;
   GeolocationPermissions.Callback geoCb; String geoOrigin;
   PermissionRequest mediaReq;
+  Runnable pushPending;
 
   int dp(float v) { return Math.round(TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, v, getResources().getDisplayMetrics())); }
+  int alpha(int color, int a) { return (color & 0x00FFFFFF) | (a << 24); }
 
   /* ================================================================ UI */
   @Override protected void onCreate(Bundle b) {
     super.onCreate(b);
     prefs = getSharedPreferences("kb", MODE_PRIVATE);
     adblockOn = prefs.getBoolean("adblock", true);
+    computePalette();
 
     Window w = getWindow();
     w.setStatusBarColor(BG);
-    w.setNavigationBarColor(BG);
+    w.setNavigationBarColor(BAR);
 
     root = new FrameLayout(this);
     root.setBackgroundColor(BG);
@@ -138,105 +153,96 @@ public class BrowserActivity extends Activity {
     LinearLayout col = new LinearLayout(this);
     col.setOrientation(LinearLayout.VERTICAL);
 
-    /* ---- top strip: padlock + address ---- */
-    topBar = new LinearLayout(this);
-    topBar.setOrientation(LinearLayout.HORIZONTAL);
-    topBar.setGravity(Gravity.CENTER_VERTICAL);
-    topBar.setBackgroundColor(BG);
-
-    secIc = new Icon(this, Icon.GLOBE);
-    secIc.setLayoutParams(new LinearLayout.LayoutParams(dp(40), dp(48)));
-    topBar.addView(secIc);
-
-    addr = new EditText(this);
-    addr.setBackground(null);
-    addr.setTextColor(TEXT);
-    addr.setHintTextColor(DIM2);
-    addr.setHint("Search or enter address");
-    addr.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
-    addr.setSingleLine(true);
-    addr.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
-    addr.setImeOptions(EditorInfo.IME_ACTION_GO | EditorInfo.IME_FLAG_NO_EXTRACT_UI);
-    addr.setSelectAllOnFocus(true);
-    LinearLayout.LayoutParams alp = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f);
-    addr.setLayoutParams(alp);
-    addr.setOnEditorActionListener((v, actionId, ev) -> {
-      if (actionId == EditorInfo.IME_ACTION_GO || (ev != null && ev.getKeyCode() == KeyEvent.KEYCODE_ENTER)) {
-        String q = addr.getText().toString().trim();
-        if (q.length() > 0) { navigate(toURL(q)); hideKeyboard(); }
-        return true;
-      }
-      return false;
-    });
-    topBar.addView(addr);
-
-    Icon reload = new Icon(this, Icon.RELOAD);
-    reload.setLayoutParams(new LinearLayout.LayoutParams(dp(44), dp(48)));
-    reload.setOnClickListener(v -> { Tab t = at(); if (t != null && t.wv != null) t.wv.reload(); });
-    topBar.addView(reload);
-
-    col.addView(topBar, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(48)));
-    col.addView(hairline());
-
+    /* top: just a thin progress line */
     progress = new View(this);
     progress.setBackgroundColor(ACCENT);
     FrameLayout progWrap = new FrameLayout(this);
     progWrap.addView(progress, new FrameLayout.LayoutParams(0, dp(2)));
     col.addView(progWrap, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(2)));
 
-    /* ---- web container ---- */
+    /* web container */
     container = new FrameLayout(this);
     col.addView(container, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
 
-    /* ---- bottom bar: back fwd KONEKT tabs menu ---- */
-    col.addView(hairline());
-    bottomBar = new LinearLayout(this);
-    bottomBar.setOrientation(LinearLayout.HORIZONTAL);
-    bottomBar.setBackgroundColor(BG);
+    /* ---- BOTTOM chrome: address row + nav row ---- */
+    bottomWrap = new LinearLayout(this);
+    bottomWrap.setOrientation(LinearLayout.VERTICAL);
 
-    backB = barIcon(Icon.BACK, v -> { Tab t = at(); if (t != null && t.wv != null && t.wv.canGoBack()) t.wv.goBack(); });
-    fwdB = barIcon(Icon.FWD, v -> { Tab t = at(); if (t != null && t.wv != null && t.wv.canGoForward()) t.wv.goForward(); });
-    Icon kon = barIcon(Icon.GLOBE, v -> openKonekt());
-    tabsB = barIcon(Icon.TABS, v -> showTabs(true));
-    Icon menu = barIcon(Icon.MENU, v -> showMenu(true));
-    bottomBar.addView(backB); bottomBar.addView(fwdB); bottomBar.addView(kon);
-    bottomBar.addView(tabsB); bottomBar.addView(menu);
-    col.addView(bottomBar, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(52)));
+    addrRowLine = new View(this);
+    bottomWrap.addView(addrRowLine, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 1));
 
+    addrRow = new LinearLayout(this);
+    addrRow.setOrientation(LinearLayout.HORIZONTAL);
+    addrRow.setGravity(Gravity.CENTER_VERTICAL);
+
+    lockIc = new Icon(this, Icon.GLOBE);
+    lockIc.setLayoutParams(new LinearLayout.LayoutParams(dp(40), dp(46)));
+    lockIc.setOnClickListener(v -> { if (addr != null) { addr.requestFocus(); addr.selectAll(); showKeyboard(); } });
+    addrRow.addView(lockIc);
+
+    addr = new EditText(this);
+    addr.setBackground(null);
+    addr.setHint("Search or enter address");
+    addr.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
+    addr.setSingleLine(true);
+    addr.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
+    addr.setImeOptions(EditorInfo.IME_ACTION_GO | EditorInfo.IME_FLAG_NO_EXTRACT_UI);
+    addr.setSelectAllOnFocus(true);
+    addr.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f));
+    addr.setOnEditorActionListener((v, id, ev) -> {
+      if (id == EditorInfo.IME_ACTION_GO || (ev != null && ev.getKeyCode() == KeyEvent.KEYCODE_ENTER)) {
+        String q = addr.getText().toString().trim();
+        if (q.length() > 0) { navigate(toURL(q)); hideKeyboard(); }
+        return true;
+      }
+      return false;
+    });
+    addrRow.addView(addr);
+
+    reloadIc = new Icon(this, Icon.RELOAD);
+    reloadIc.setLayoutParams(new LinearLayout.LayoutParams(dp(44), dp(46)));
+    reloadIc.setOnClickListener(v -> { Tab t = at(); if (t != null && t.wv != null) t.wv.reload(); });
+    addrRow.addView(reloadIc);
+    bottomWrap.addView(addrRow, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(46)));
+
+    navRowLine = new View(this);
+    bottomWrap.addView(navRowLine, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 1));
+
+    navRow = new LinearLayout(this);
+    navRow.setOrientation(LinearLayout.HORIZONTAL);
+    backB = navIcon(Icon.BACK, v -> { Tab t = at(); if (t != null && t.wv != null && t.wv.canGoBack()) t.wv.goBack(); });
+    fwdB  = navIcon(Icon.FWD,  v -> { Tab t = at(); if (t != null && t.wv != null && t.wv.canGoForward()) t.wv.goForward(); });
+    tabsB = navIcon(Icon.TABS, v -> showTabs());
+    acctB = navIcon(Icon.PERSON, v -> showAccount());
+    menuB = navIcon(Icon.MENU, v -> showMenu());
+    navRow.addView(backB); navRow.addView(fwdB); navRow.addView(tabsB); navRow.addView(acctB); navRow.addView(menuB);
+    bottomWrap.addView(navRow, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(52)));
+
+    col.addView(bottomWrap, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
     root.addView(col, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 
-    /* overlays */
-    buildTabSheet();
-    buildMenuSheet();
     fsHolder = new FrameLayout(this);
-    fsHolder.setBackgroundColor(BG);
+    fsHolder.setBackgroundColor(0xFF000000);
     fsHolder.setVisibility(View.GONE);
     root.addView(fsHolder, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 
     setContentView(root);
     defaultUA = WebSettings.getDefaultUserAgent(this);
+    applyAppearance();
 
-    /* session restore or intent url */
     String intentUrl = urlFromIntent(getIntent());
     restoreSession();
     if (tabs.isEmpty()) newTab(START, false);
     if (intentUrl != null) newTab(intentUrl, false);
   }
 
-  View hairline() {
-    View v = new View(this);
-    v.setBackgroundColor(LINE3);
-    v.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 1));
-    return v;
-  }
-
-  Icon barIcon(int type, View.OnClickListener fn) {
+  Icon navIcon(int type, View.OnClickListener fn) {
     Icon ic = new Icon(this, type);
-    LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f);
-    ic.setLayoutParams(lp);
+    ic.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f));
     ic.setOnClickListener(fn);
     return ic;
   }
+  View hairline() { View v = new View(this); v.setBackgroundColor(LINE3); return v; }
 
   String urlFromIntent(Intent i) {
     if (i != null && Intent.ACTION_VIEW.equals(i.getAction()) && i.getData() != null) {
@@ -245,15 +251,72 @@ public class BrowserActivity extends Activity {
     }
     return null;
   }
+  @Override protected void onNewIntent(Intent i) { super.onNewIntent(i); String u = urlFromIntent(i); if (u != null) newTab(u, false); }
 
-  @Override protected void onNewIntent(Intent i) {
-    super.onNewIntent(i);
-    String u = urlFromIntent(i);
-    if (u != null) newTab(u, false);
+  /* ================================================================ appearance */
+  int parseColor(String s, int def) { try { return Color.parseColor(s); } catch (Exception e) { return def; } }
+  String mode() { return prefs.getString("mode", "dark"); }
+  String wall() { return prefs.getString("wallpaper", "none"); }
+
+  void computePalette() {
+    String m = mode();
+    glass = m.equals("glass");
+    ACCENT = parseColor(prefs.getString("accent", "#1d9bf0"), 0xFF1D9BF0);
+    if (m.equals("light")) {
+      BG = 0xFFFFFFFF; HOVER2 = 0xFFE8E8E8;
+      LINE = 0xFFC4C4C4; LINE2 = 0xFF8F8F8F; LINE3 = 0xFFE2E2E2;
+      TEXT = 0xFF000000; DIM = 0xFF666666; DIM2 = 0xFF8A8A8A;
+      BAR = 0xFFFFFFFF;
+    } else {
+      BG = 0xFF000000; HOVER2 = 0xFF141414;
+      LINE = 0xFF434343; LINE2 = 0xFF666666; LINE3 = 0xFF232323;
+      TEXT = 0xFFFFFFFF; DIM = 0xFF999999; DIM2 = 0xFF6F6F6F;
+      BAR = 0xFF000000;
+    }
+    if (glass) BAR = alpha(BG, 0xCC);   // translucent bars over the page/wallpaper
+  }
+
+  void applyAppearance() {
+    computePalette();
+    if (root != null) root.setBackgroundColor(BG);
+    if (container != null) container.setBackgroundColor(BG);
+    getWindow().setStatusBarColor(BG);
+    getWindow().setNavigationBarColor(glass ? BG : BAR);
+
+    int barBg = glass ? BAR : BG;
+    if (bottomWrap != null) bottomWrap.setBackgroundColor(barBg);
+    if (addrRow != null) addrRow.setBackgroundColor(0);
+    if (navRow != null) navRow.setBackgroundColor(0);
+    if (addrRowLine != null) addrRowLine.setBackgroundColor(LINE3);
+    if (navRowLine != null) navRowLine.setBackgroundColor(LINE3);
+    if (progress != null) progress.setBackgroundColor(ACCENT);
+
+    if (addr != null) {
+      addr.setTextColor(TEXT); addr.setHintTextColor(DIM2);
+      GradientDrawable pill = new GradientDrawable();
+      pill.setColor(glass ? alpha(TEXT, 0x14) : HOVER2);
+      pill.setCornerRadius(0);
+      pill.setStroke(dp(1), LINE3);
+      addr.setBackground(pill);
+      addr.setPadding(dp(12), dp(6), dp(12), dp(6));
+    }
+    Icon[] all = { lockIc, reloadIc, backB, fwdB, tabsB, acctB, menuB };
+    for (Icon ic : all) if (ic != null) ic.tint(DIM);
+    renderChrome();
+    // Speed Dial reflects the new look
+    Tab t = at();
+    if (t != null && t.wv != null && t.url != null && t.url.startsWith("file:")) t.wv.reload();
+  }
+
+  String appearanceJson() {
+    JSONObject o = new JSONObject();
+    try { o.put("mode", mode()); o.put("accent", prefs.getString("accent", "#1d9bf0")); o.put("wallpaper", wall()); } catch (Exception e) {}
+    return o.toString();
   }
 
   /* ================================================================ tabs */
   Tab at() { return cur >= 0 && cur < tabs.size() ? tabs.get(cur) : null; }
+  WebView wvOf(Tab t) { return t == null ? null : t.wv; }
 
   Tab newTab(String url, boolean background) {
     Tab t = new Tab();
@@ -264,7 +327,6 @@ public class BrowserActivity extends Activity {
     else renderChrome();
     return t;
   }
-
   void activate(int i) {
     if (i < 0 || i >= tabs.size()) return;
     cur = i;
@@ -274,49 +336,37 @@ public class BrowserActivity extends Activity {
     renderChrome();
     saveSession();
   }
-
   void closeTab(int i) {
     if (i < 0 || i >= tabs.size()) return;
     Tab t = tabs.remove(i);
     if (t.wv != null) { container.removeView(t.wv); t.wv.destroy(); }
     if (tabs.isEmpty()) { cur = -1; newTab(START, false); return; }
     if (cur >= tabs.size()) cur = tabs.size() - 1;
-    else if (i <= cur && cur > 0) cur--;
+    else if (i < cur) cur--;
     activate(cur);
   }
-
   void navigate(String url) {
     Tab t = at();
     if (t == null) { newTab(url, false); return; }
-    t.url = url;
-    t.wv.loadUrl(url);
+    t.url = url; t.wv.loadUrl(url);
   }
-
   void openKonekt() {
-    for (int i = 0; i < tabs.size(); i++) {
-      String u = tabs.get(i).url;
-      if (u != null && u.startsWith(KONEKT_URL)) { activate(i); return; }
-    }
+    for (int i = 0; i < tabs.size(); i++) { String u = tabs.get(i).url; if (u != null && u.startsWith(KONEKT_URL)) { activate(i); return; } }
     newTab(KONEKT_URL, false);
   }
 
   /* ================================================================ URL logic */
   String engineKey() { return prefs.getString("engine", "google"); }
-  String[] engine() {
-    String k = engineKey();
-    for (String[] e : ENGINES) if (e[0].equals(k)) return e;
-    return ENGINES[0];
-  }
-
+  String[] engine() { String k = engineKey(); for (String[] e : ENGINES) if (e[0].equals(k)) return e; return ENGINES[0]; }
   String toURL(String q) {
     q = q.trim();
     if (q.isEmpty()) return START;
     if (q.equals("konekt://start")) return START;
-    String lower = q.toLowerCase(Locale.US);
-    if (lower.startsWith("http://") || lower.startsWith("https://") || lower.startsWith("file:") || lower.startsWith("data:") || lower.startsWith("about:")) return q;
-    if (lower.matches("^localhost(:\\d+)?([/?#].*)?$")) return "http://" + q;
-    if (lower.matches("^\\d{1,3}(\\.\\d{1,3}){3}(:\\d+)?([/?#].*)?$")) return "http://" + q;
-    if (!q.contains(" ") && lower.matches("^[\\w-]+(\\.[\\w-]+)+(:\\d+)?([/?#].*)?$")) return "https://" + q;
+    String l = q.toLowerCase(Locale.US);
+    if (l.startsWith("http://") || l.startsWith("https://") || l.startsWith("file:") || l.startsWith("data:") || l.startsWith("about:")) return q;
+    if (l.matches("^localhost(:\\d+)?([/?#].*)?$")) return "http://" + q;
+    if (l.matches("^\\d{1,3}(\\.\\d{1,3}){3}(:\\d+)?([/?#].*)?$")) return "http://" + q;
+    if (!q.contains(" ") && l.matches("^[\\w-]+(\\.[\\w-]+)+(:\\d+)?([/?#].*)?$")) return "https://" + q;
     return engine()[2] + Uri.encode(q);
   }
 
@@ -338,7 +388,7 @@ public class BrowserActivity extends Activity {
     s.setMediaPlaybackRequiresUserGesture(true);
     CookieManager.getInstance().setAcceptThirdPartyCookies(wv, true);
     wv.addJavascriptInterface(new KBridge(t), "KB");
-    wv.setDownloadListener((url, ua, contentDisposition, mimetype, contentLength) -> download(url, ua, contentDisposition, mimetype));
+    wv.setDownloadListener((url, ua, cd, mt, len) -> download(url, ua, cd, mt));
 
     wv.setWebViewClient(new WebViewClient() {
       @Override public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest req) {
@@ -346,638 +396,668 @@ public class BrowserActivity extends Activity {
         if (u.startsWith("http:") || u.startsWith("https:") || u.startsWith("file:") || u.startsWith("data:") || u.startsWith("about:")) return false;
         try {
           Intent it = u.startsWith("intent:") ? Intent.parseUri(u, Intent.URI_INTENT_SCHEME) : new Intent(Intent.ACTION_VIEW, Uri.parse(u));
-          it.addCategory(Intent.CATEGORY_BROWSABLE);
-          it.setComponent(null);
+          it.addCategory(Intent.CATEGORY_BROWSABLE); it.setComponent(null);
           if (it.resolveActivity(getPackageManager()) != null) startActivity(it);
         } catch (Exception ignored) {}
         return true;
       }
-      @Override public void onPageStarted(WebView view, String url, android.graphics.Bitmap favicon) {
-        t.url = url;
-        if (view == wvOf(at())) renderChrome();
-      }
+      @Override public void onPageStarted(WebView view, String url, android.graphics.Bitmap f) { t.url = url; if (view == wvOf(at())) renderChrome(); }
       @Override public void onPageFinished(WebView view, String url) {
         t.url = url;
         if (t.title == null || t.title.isEmpty()) t.title = view.getTitle();
         recordVisit(url, view.getTitle());
-        if (view == wvOf(at())) { renderChrome(); setLoadProgress(100); }
+        if (view == wvOf(at())) { renderChrome(); setLoad(100); }
         saveSession();
       }
       @Override public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest req) {
         if (adblockOn) {
           String host = req.getUrl().getHost();
-          if (host != null) {
-            String h = host.toLowerCase(Locale.US);
-            for (String d : ADBLOCK) {
-              if (h.equals(d) || h.endsWith("." + d)) {
-                adBlocked++;
-                return new WebResourceResponse("text/plain", "utf-8", new ByteArrayInputStream(new byte[0]));
-              }
-            }
-          }
+          if (host != null) { String h = host.toLowerCase(Locale.US);
+            for (String d : ADBLOCK) if (h.equals(d) || h.endsWith("." + d)) { adBlocked++; return new WebResourceResponse("text/plain", "utf-8", new ByteArrayInputStream(new byte[0])); } }
         }
         return null;
       }
       @Override public void onReceivedError(WebView view, WebResourceRequest req, android.webkit.WebResourceError err) {
         if (Build.VERSION.SDK_INT >= 23 && req.isForMainFrame()) {
           String u = req.getUrl().toString();
-          String desc = String.valueOf(err.getDescription());
-          view.loadDataWithBaseURL(null, errPage(u, desc), "text/html", "utf-8", u);
+          view.loadDataWithBaseURL(null, errPage(u, String.valueOf(err.getDescription())), "text/html", "utf-8", u);
         }
       }
     });
 
     wv.setWebChromeClient(new WebChromeClient() {
-      @Override public void onProgressChanged(WebView view, int p) {
-        if (view == wvOf(at())) setLoadProgress(p);
-      }
-      @Override public void onReceivedTitle(WebView view, String title) {
-        t.title = title;
-        if (view == wvOf(at())) renderChrome();
-      }
-      @Override public boolean onCreateWindow(WebView view, boolean isDialog, boolean isUserGesture, Message resultMsg) {
-        if (!isUserGesture) return false;
+      @Override public void onProgressChanged(WebView view, int p) { if (view == wvOf(at())) setLoad(p); }
+      @Override public void onReceivedTitle(WebView view, String title) { t.title = title; if (view == wvOf(at())) renderChrome(); }
+      @Override public boolean onCreateWindow(WebView view, boolean d, boolean userGesture, Message resultMsg) {
+        if (!userGesture) return false;
         Tab nt = newTab(null, false);
         WebView.WebViewTransport tr = (WebView.WebViewTransport) resultMsg.obj;
-        tr.setWebView(nt.wv);
-        resultMsg.sendToTarget();
-        return true;
+        tr.setWebView(nt.wv); resultMsg.sendToTarget(); return true;
       }
-      @Override public void onCloseWindow(WebView view) {
-        for (int i = 0; i < tabs.size(); i++) if (tabs.get(i).wv == view) { closeTab(i); return; }
-      }
+      @Override public void onCloseWindow(WebView view) { for (int i = 0; i < tabs.size(); i++) if (tabs.get(i).wv == view) { closeTab(i); return; } }
       @Override public void onShowCustomView(View v, CustomViewCallback cb) {
         if (customView != null) { cb.onCustomViewHidden(); return; }
         customView = v; customCb = cb;
         fsHolder.addView(v, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         fsHolder.setVisibility(View.VISIBLE);
-        getWindow().getDecorView().setSystemUiVisibility(
-          View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY | View.SYSTEM_UI_FLAG_FULLSCREEN | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION);
+        getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY | View.SYSTEM_UI_FLAG_FULLSCREEN | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION);
       }
-      @Override public void onHideCustomView() {
-        if (customView == null) return;
-        fsHolder.removeView(customView);
-        fsHolder.setVisibility(View.GONE);
-        customView = null;
-        if (customCb != null) { customCb.onCustomViewHidden(); customCb = null; }
-        getWindow().getDecorView().setSystemUiVisibility(0);
-      }
+      @Override public void onHideCustomView() { exitFullscreen(); }
       @Override public void onGeolocationPermissionsShowPrompt(String origin, GeolocationPermissions.Callback cb) {
-        if (checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
-          askSite(origin + " wants to know your location", () -> cb.invoke(origin, true, true), () -> cb.invoke(origin, false, false));
-        } else {
-          geoCb = cb; geoOrigin = origin;
-          requestPermissions(new String[]{android.Manifest.permission.ACCESS_FINE_LOCATION}, 71);
-        }
+        if (checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED)
+          askSite(origin + " wants your location", () -> cb.invoke(origin, true, true), () -> cb.invoke(origin, false, false));
+        else { geoCb = cb; geoOrigin = origin; requestPermissions(new String[]{android.Manifest.permission.ACCESS_FINE_LOCATION}, 71); }
       }
       @Override public void onPermissionRequest(PermissionRequest req) {
         List<String> need = new ArrayList<>();
         for (String r : req.getResources()) {
-          if (PermissionRequest.RESOURCE_VIDEO_CAPTURE.equals(r) && checkSelfPermission(android.Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED)
-            need.add(android.Manifest.permission.CAMERA);
-          if (PermissionRequest.RESOURCE_AUDIO_CAPTURE.equals(r) && checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED)
-            need.add(android.Manifest.permission.RECORD_AUDIO);
+          if (PermissionRequest.RESOURCE_VIDEO_CAPTURE.equals(r) && checkSelfPermission(android.Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) need.add(android.Manifest.permission.CAMERA);
+          if (PermissionRequest.RESOURCE_AUDIO_CAPTURE.equals(r) && checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) need.add(android.Manifest.permission.RECORD_AUDIO);
         }
-        if (need.isEmpty()) {
-          askSite(req.getOrigin().getHost() + " wants to use your camera or microphone",
-            () -> req.grant(req.getResources()), req::deny);
-        } else {
-          mediaReq = req;
-          requestPermissions(need.toArray(new String[0]), 72);
-        }
+        if (need.isEmpty()) askSite(req.getOrigin().getHost() + " wants camera or microphone", () -> req.grant(req.getResources()), req::deny);
+        else { mediaReq = req; requestPermissions(need.toArray(new String[0]), 72); }
       }
       @Override public boolean onShowFileChooser(WebView view, ValueCallback<Uri[]> cb, FileChooserParams params) {
         if (fileCb != null) fileCb.onReceiveValue(null);
         fileCb = cb;
-        try { startActivityForResult(params.createIntent(), 73); }
-        catch (Exception e) { fileCb = null; return false; }
+        try { startActivityForResult(params.createIntent(), 73); } catch (Exception e) { fileCb = null; return false; }
         return true;
       }
-      @Override public boolean onJsAlert(WebView view, String url, String message, final android.webkit.JsResult r) {
-        new AlertDialog.Builder(BrowserActivity.this).setMessage(message)
-          .setPositiveButton("OK", (d, x) -> r.confirm())
-          .setOnCancelListener(d -> r.cancel()).show();
-        return true;
-      }
-      @Override public boolean onJsConfirm(WebView view, String url, String message, final android.webkit.JsResult r) {
-        new AlertDialog.Builder(BrowserActivity.this).setMessage(message)
-          .setPositiveButton("OK", (d, x) -> r.confirm())
-          .setNegativeButton("Cancel", (d, x) -> r.cancel())
-          .setOnCancelListener(d -> r.cancel()).show();
-        return true;
-      }
-      @Override public boolean onJsPrompt(WebView view, String url, String message, String def, final android.webkit.JsPromptResult r) {
-        final EditText in = new EditText(BrowserActivity.this);
-        in.setText(def == null ? "" : def);
-        new AlertDialog.Builder(BrowserActivity.this).setMessage(message).setView(in)
-          .setPositiveButton("OK", (d, x) -> r.confirm(in.getText().toString()))
-          .setNegativeButton("Cancel", (d, x) -> r.cancel())
-          .setOnCancelListener(d -> r.cancel()).show();
-        return true;
-      }
+      @Override public boolean onJsAlert(WebView v, String url, String m, final android.webkit.JsResult r) {
+        new AlertDialog.Builder(BrowserActivity.this).setMessage(m).setPositiveButton("OK", (d, x) -> r.confirm()).setOnCancelListener(d -> r.cancel()).show(); return true; }
+      @Override public boolean onJsConfirm(WebView v, String url, String m, final android.webkit.JsResult r) {
+        new AlertDialog.Builder(BrowserActivity.this).setMessage(m).setPositiveButton("OK", (d, x) -> r.confirm()).setNegativeButton("Cancel", (d, x) -> r.cancel()).setOnCancelListener(d -> r.cancel()).show(); return true; }
     });
     return wv;
   }
 
-  WebView wvOf(Tab t) { return t == null ? null : t.wv; }
-
+  void exitFullscreen() {
+    if (customView == null) return;
+    fsHolder.removeView(customView); fsHolder.setVisibility(View.GONE); customView = null;
+    if (customCb != null) { customCb.onCustomViewHidden(); customCb = null; }
+    getWindow().getDecorView().setSystemUiVisibility(0);
+  }
   void askSite(String what, Runnable yes, Runnable no) {
-    new AlertDialog.Builder(this).setMessage(what)
-      .setPositiveButton("Allow", (d, x) -> yes.run())
-      .setNegativeButton("Block", (d, x) -> no.run())
-      .setOnCancelListener(d -> no.run()).show();
+    new AlertDialog.Builder(this).setMessage(what).setPositiveButton("Allow", (d, x) -> yes.run()).setNegativeButton("Block", (d, x) -> no.run()).setOnCancelListener(d -> no.run()).show();
   }
-
   String errPage(String url, String desc) {
-    return "<!doctype html><meta name=viewport content='width=device-width,initial-scale=1'>" +
-      "<body style='background:#000;color:#fff;font-family:sans-serif;padding:40px 24px'>" +
-      "<h2 style='font-weight:800'>Can&rsquo;t reach this page</h2>" +
-      "<div style='color:#999;font-size:13px;word-break:break-all;margin:10px 0'>" + esc(url) + "</div>" +
-      "<div style='color:#999;font-size:13px;font-family:monospace'>" + esc(desc) + "</div>" +
-      "<div style='margin-top:26px'><a href='" + esc(url) + "' style='color:#000;background:#fff;padding:10px 22px;" +
-      "text-decoration:none;font-weight:700;font-size:12px;letter-spacing:.08em'>RETRY</a></div></body>";
+    return "<!doctype html><meta name=viewport content='width=device-width,initial-scale=1'>"
+      + "<body style='background:#000;color:#fff;font-family:sans-serif;padding:40px 24px'>"
+      + "<h2 style='font-weight:800'>Can&rsquo;t reach this page</h2>"
+      + "<div style='color:#999;font-size:13px;word-break:break-all;margin:10px 0'>" + esc(url) + "</div>"
+      + "<div style='color:#999;font-size:13px;font-family:monospace'>" + esc(desc) + "</div>"
+      + "<div style='margin-top:26px'><a href='" + esc(url) + "' style='color:#000;background:#fff;padding:10px 22px;text-decoration:none;font-weight:700;font-size:12px'>RETRY</a></div></body>";
   }
-
-  static String esc(String s) {
-    if (s == null) return "";
-    return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;");
-  }
+  static String esc(String s) { return s == null ? "" : s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;"); }
 
   /* ================================================================ chrome state */
   void renderChrome() {
     Tab t = at();
-    if (t == null) return;
+    if (t == null || addr == null) return;
     boolean start = t.url == null || t.url.startsWith("file:///android_asset");
     if (!addr.hasFocus()) addr.setText(start ? "" : t.url);
-    secIc.setType(start ? Icon.GLOBE : (t.url.startsWith("https:") ? Icon.LOCK : Icon.UNLOCK));
-    backB.setAlpha(t.wv != null && t.wv.canGoBack() ? 1f : 0.3f);
-    fwdB.setAlpha(t.wv != null && t.wv.canGoForward() ? 1f : 0.3f);
+    lockIc.setType(start ? Icon.GLOBE : (t.url.startsWith("https:") ? Icon.LOCK : Icon.UNLOCK));
+    lockIc.tint(start ? DIM : (t.url.startsWith("https:") ? TEXT : 0xFFFFD400));
+    backB.setAlpha(t.wv != null && t.wv.canGoBack() ? 1f : .3f);
+    fwdB.setAlpha(t.wv != null && t.wv.canGoForward() ? 1f : .3f);
     tabsB.setCount(tabs.size());
+    acctB.setType(prefs.getString("token", null) != null ? Icon.PERSON_ON : Icon.PERSON);
+    acctB.tint(prefs.getString("token", null) != null ? ACCENT : DIM);
   }
-
-  void setLoadProgress(int p) {
+  void setLoad(int p) {
+    if (progress == null) return;
     ViewGroup.LayoutParams lp = progress.getLayoutParams();
     int w = container.getWidth() > 0 ? container.getWidth() : getResources().getDisplayMetrics().widthPixels;
     lp.width = p >= 100 ? 0 : (int) (w * (p / 100f));
     progress.setLayoutParams(lp);
   }
-
-  void hideKeyboard() {
-    InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
-    if (imm != null) imm.hideSoftInputFromWindow(addr.getWindowToken(), 0);
-    addr.clearFocus();
-  }
+  void showKeyboard() { InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE); if (imm != null) imm.showSoftInput(addr, InputMethodManager.SHOW_IMPLICIT); }
+  void hideKeyboard() { InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE); if (imm != null) imm.hideSoftInputFromWindow(addr.getWindowToken(), 0); addr.clearFocus(); }
 
   /* ================================================================ downloads */
-  void download(String url, String ua, String contentDisposition, String mimetype) {
-    if (Build.VERSION.SDK_INT < 29 &&
-        checkSelfPermission(android.Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+  void download(String url, String ua, String cd, String mt) {
+    if (Build.VERSION.SDK_INT < 29 && checkSelfPermission(android.Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
       requestPermissions(new String[]{android.Manifest.permission.WRITE_EXTERNAL_STORAGE}, 74);
-      Toast.makeText(this, "Storage access needed â€” tap the download again", Toast.LENGTH_LONG).show();
-      return;
+      Toast.makeText(this, "Storage access needed — tap the download again", Toast.LENGTH_LONG).show(); return;
     }
     try {
-      String name = URLUtil.guessFileName(url, contentDisposition, mimetype);
+      String name = URLUtil.guessFileName(url, cd, mt);
       DownloadManager.Request r = new DownloadManager.Request(Uri.parse(url));
-      r.setMimeType(mimetype);
-      r.addRequestHeader("User-Agent", ua);
-      String cookie = CookieManager.getInstance().getCookie(url);
-      if (cookie != null) r.addRequestHeader("Cookie", cookie);
+      r.setMimeType(mt); r.addRequestHeader("User-Agent", ua);
+      String cookie = CookieManager.getInstance().getCookie(url); if (cookie != null) r.addRequestHeader("Cookie", cookie);
       r.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
       r.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, name);
-      DownloadManager dm = (DownloadManager) getSystemService(DOWNLOAD_SERVICE);
-      dm.enqueue(r);
+      ((DownloadManager) getSystemService(DOWNLOAD_SERVICE)).enqueue(r);
       Toast.makeText(this, "Downloading " + name, Toast.LENGTH_SHORT).show();
-    } catch (Exception e) {
-      Toast.makeText(this, "Download failed", Toast.LENGTH_SHORT).show();
-    }
+    } catch (Exception e) { Toast.makeText(this, "Download failed", Toast.LENGTH_SHORT).show(); }
   }
 
-  /* ================================================================ prefs: session, visits, dials */
+  /* ================================================================ prefs: session, visits, dials, bookmarks */
   void saveSession() {
-    try {
-      JSONArray a = new JSONArray();
-      for (Tab t : tabs) a.put(t.url == null ? START : t.url);
-      prefs.edit().putString("session", a.toString()).putInt("cur", cur).apply();
-    } catch (Exception ignored) {}
+    try { JSONArray a = new JSONArray(); for (Tab t : tabs) a.put(t.url == null ? START : t.url);
+      prefs.edit().putString("session", a.toString()).putInt("cur", cur).apply(); } catch (Exception ignored) {}
   }
-
   void restoreSession() {
-    try {
-      String s = prefs.getString("session", null);
-      if (s == null) return;
-      JSONArray a = new JSONArray(s);
-      int want = prefs.getInt("cur", 0);
-      for (int i = 0; i < a.length() && i < 10; i++) newTab(a.getString(i), true);
-      if (!tabs.isEmpty()) activate(Math.max(0, Math.min(want, tabs.size() - 1)));
-    } catch (Exception ignored) {}
+    try { String s = prefs.getString("session", null); if (s == null) return;
+      JSONArray a = new JSONArray(s); int want = prefs.getInt("cur", 0);
+      for (int i = 0; i < a.length() && i < 12; i++) newTab(a.getString(i), true);
+      if (!tabs.isEmpty()) activate(Math.max(0, Math.min(want, tabs.size() - 1))); } catch (Exception ignored) {}
   }
-
   void recordVisit(String url, String title) {
     if (url == null || !url.startsWith("http")) return;
     try {
-      Uri u = Uri.parse(url);
-      String host = u.getHost();
-      if (host == null) return;
+      Uri u = Uri.parse(url); String host = u.getHost(); if (host == null) return;
       host = host.replaceFirst("^www\\.", "");
       JSONObject all = new JSONObject(prefs.getString("hosts", "{}"));
-      JSONObject h = all.optJSONObject(host);
-      if (h == null) h = new JSONObject();
-      h.put("n", h.optInt("n") + 1);
-      h.put("u", u.getScheme() + "://" + u.getHost());
+      JSONObject h = all.optJSONObject(host); if (h == null) h = new JSONObject();
+      h.put("n", h.optInt("n") + 1); h.put("u", u.getScheme() + "://" + u.getHost());
       if (title != null && !title.isEmpty()) h.put("t", title);
-      all.put(host, h);
-      prefs.edit().putString("hosts", all.toString()).apply();
+      all.put(host, h); prefs.edit().putString("hosts", all.toString()).apply();
     } catch (Exception ignored) {}
   }
-
   String topSitesJson() {
     try {
       JSONObject all = new JSONObject(prefs.getString("hosts", "{}"));
-      List<String> keys = new ArrayList<>();
-      Iterator<String> it = all.keys();
-      while (it.hasNext()) keys.add(it.next());
+      List<String> keys = new ArrayList<>(); Iterator<String> it = all.keys(); while (it.hasNext()) keys.add(it.next());
       keys.sort((x, y) -> all.optJSONObject(y).optInt("n") - all.optJSONObject(x).optInt("n"));
       JSONArray out = new JSONArray();
-      for (int i = 0; i < keys.size() && i < 6; i++) {
-        JSONObject h = all.optJSONObject(keys.get(i));
-        JSONObject o = new JSONObject();
-        o.put("host", keys.get(i));
-        o.put("u", h.optString("u"));
-        out.put(o);
-      }
+      for (int i = 0; i < keys.size() && i < 6; i++) { JSONObject h = all.optJSONObject(keys.get(i)); JSONObject o = new JSONObject(); o.put("host", keys.get(i)); o.put("u", h.optString("u")); out.put(o); }
       return out.toString();
     } catch (Exception e) { return "[]"; }
   }
 
-  /* ================================================================ JS bridge (start page only) */
+  /* ================================================================ JS bridge (Speed Dial) */
   class KBridge {
-    final Tab tab;
-    KBridge(Tab t) { tab = t; }
+    final Tab tab; KBridge(Tab t) { tab = t; }
     boolean onStart() { return tab.url != null && tab.url.startsWith("file:///android_asset"); }
-
-    @JavascriptInterface public void go(final String q) {
-      if (!onStart()) return;
-      runOnUiThread(() -> navigate(toURL(q)));
-    }
+    @JavascriptInterface public void go(final String q) { if (onStart()) ui.post(() -> navigate(toURL(q))); }
     @JavascriptInterface public String dials() { return onStart() ? prefs.getString("dials", "[]") : "[]"; }
     @JavascriptInterface public String topSites() { return onStart() ? topSitesJson() : "[]"; }
     @JavascriptInterface public String engineName() { return engine()[1]; }
+    @JavascriptInterface public String appearance() { return onStart() ? appearanceJson() : "{}"; }
     @JavascriptInterface public void addDial(String u, String t) {
       if (!onStart() || u == null || u.trim().isEmpty()) return;
-      try {
-        String url = u.trim();
-        if (!url.matches("(?i)^[a-z]+:.*")) url = "https://" + url;
-        JSONArray a = new JSONArray(prefs.getString("dials", "[]"));
-        JSONObject o = new JSONObject();
-        o.put("u", url);
-        o.put("t", (t == null || t.trim().isEmpty()) ? Uri.parse(url).getHost() : t.trim());
-        a.put(o);
-        prefs.edit().putString("dials", a.toString()).apply();
-      } catch (Exception ignored) {}
+      try { String url = u.trim(); if (!url.matches("(?i)^[a-z]+:.*")) url = "https://" + url;
+        JSONArray a = new JSONArray(prefs.getString("dials", "[]")); JSONObject o = new JSONObject();
+        o.put("u", url); o.put("t", (t == null || t.trim().isEmpty()) ? Uri.parse(url).getHost() : t.trim());
+        a.put(o); prefs.edit().putString("dials", a.toString()).apply(); schedulePush(); } catch (Exception ignored) {}
     }
     @JavascriptInterface public void delDial(String u) {
       if (!onStart()) return;
-      try {
-        JSONArray a = new JSONArray(prefs.getString("dials", "[]"));
-        JSONArray b = new JSONArray();
-        for (int i = 0; i < a.length(); i++)
-          if (!a.getJSONObject(i).optString("u").equals(u)) b.put(a.getJSONObject(i));
-        prefs.edit().putString("dials", b.toString()).apply();
-      } catch (Exception ignored) {}
+      try { JSONArray a = new JSONArray(prefs.getString("dials", "[]")); JSONArray b = new JSONArray();
+        for (int i = 0; i < a.length(); i++) if (!a.getJSONObject(i).optString("u").equals(u)) b.put(a.getJSONObject(i));
+        prefs.edit().putString("dials", b.toString()).apply(); schedulePush(); } catch (Exception ignored) {}
     }
   }
 
-  /* ================================================================ tab sheet */
-  void buildTabSheet() {
-    tabSheet = new LinearLayout(this);
-    tabSheet.setOrientation(LinearLayout.VERTICAL);
-    tabSheet.setBackgroundColor(BG);
-    tabSheet.setVisibility(View.GONE);
-    root.addView(tabSheet, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
-  }
-
-  void showTabs(boolean show) {
-    if (!show) { tabSheet.setVisibility(View.GONE); return; }
-    showMenu(false);
-    tabSheet.removeAllViews();
-
+  /* ================================================================ bottom sheets */
+  void dismissSheet() { if (sheet != null) { root.removeView(sheet); sheet = null; } }
+  LinearLayout openSheet(String title) {
+    dismissSheet();
+    sheet = new LinearLayout(this);
+    sheet.setOrientation(LinearLayout.VERTICAL);
+    sheet.setBackgroundColor(BG);
+    sheet.setOnClickListener(v -> {});   // swallow
+    // header
     LinearLayout head = new LinearLayout(this);
-    head.setOrientation(LinearLayout.HORIZONTAL);
-    head.setGravity(Gravity.CENTER_VERTICAL);
-    head.setPadding(dp(16), dp(10), dp(6), dp(10));
-    TextView h = label("TABS");
-    LinearLayout.LayoutParams hlp = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
-    h.setLayoutParams(hlp);
+    head.setOrientation(LinearLayout.HORIZONTAL); head.setGravity(Gravity.CENTER_VERTICAL);
+    head.setPadding(dp(16), dp(12), dp(6), dp(10));
+    TextView h = new TextView(this); h.setText(title); h.setTextColor(DIM); h.setTextSize(TypedValue.COMPLEX_UNIT_SP, 10); h.setLetterSpacing(.16f);
+    h.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
     head.addView(h);
-    Icon x = new Icon(this, Icon.X);
-    x.setLayoutParams(new LinearLayout.LayoutParams(dp(44), dp(44)));
-    x.setOnClickListener(v -> showTabs(false));
-    head.addView(x);
-    tabSheet.addView(head);
-    tabSheet.addView(hairline());
-
-    TextView nt = new TextView(this);
-    nt.setText("+  NEW TAB");
-    nt.setTextColor(TEXT);
-    nt.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
-    nt.setTypeface(Typeface.DEFAULT_BOLD);
-    nt.setLetterSpacing(0.08f);
-    nt.setPadding(dp(16), dp(15), dp(16), dp(15));
-    nt.setOnClickListener(v -> { showTabs(false); newTab(START, false); });
-    tabSheet.addView(nt);
-    tabSheet.addView(hairline());
-
-    ScrollView sc = new ScrollView(this);
-    LinearLayout list = new LinearLayout(this);
-    list.setOrientation(LinearLayout.VERTICAL);
-    sc.addView(list);
-    for (int i = 0; i < tabs.size(); i++) {
-      final int idx = i;
-      Tab t = tabs.get(i);
-      LinearLayout row = new LinearLayout(this);
-      row.setOrientation(LinearLayout.HORIZONTAL);
-      row.setGravity(Gravity.CENTER_VERTICAL);
-      row.setPadding(dp(16), dp(12), dp(6), dp(12));
-      if (i == cur) row.setBackgroundColor(HOVER2);
-
-      LinearLayout txt = new LinearLayout(this);
-      txt.setOrientation(LinearLayout.VERTICAL);
-      LinearLayout.LayoutParams tlp = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
-      txt.setLayoutParams(tlp);
-      boolean start = t.url == null || t.url.startsWith("file:");
-      TextView title = new TextView(this);
-      title.setText(start ? "Speed Dial" : (t.title == null || t.title.isEmpty() ? "New tab" : t.title));
-      title.setTextColor(i == cur ? TEXT : 0xFFD8D8D8);
-      title.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
-      title.setTypeface(Typeface.DEFAULT_BOLD);
-      title.setSingleLine(true);
-      TextView sub = new TextView(this);
-      sub.setText(start ? "konekt://start" : t.url);
-      sub.setTextColor(DIM);
-      sub.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11);
-      sub.setSingleLine(true);
-      txt.addView(title); txt.addView(sub);
-      row.addView(txt);
-
-      Icon cx = new Icon(this, Icon.X);
-      cx.setLayoutParams(new LinearLayout.LayoutParams(dp(44), dp(44)));
-      cx.setOnClickListener(v -> { closeTab(idx); showTabs(true); });
-      row.addView(cx);
-
-      row.setOnClickListener(v -> { activate(idx); showTabs(false); });
-      list.addView(row);
-      list.addView(hairline());
-    }
-    tabSheet.addView(sc, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
-    tabSheet.setVisibility(View.VISIBLE);
-  }
-
-  TextView label(String s) {
-    TextView tv = new TextView(this);
-    tv.setText(s);
-    tv.setTextColor(DIM);
-    tv.setTextSize(TypedValue.COMPLEX_UNIT_SP, 10);
-    tv.setLetterSpacing(0.16f);
-    return tv;
-  }
-
-  /* ================================================================ menu sheet */
-  void buildMenuSheet() {
-    menuSheet = new LinearLayout(this);
-    menuSheet.setOrientation(LinearLayout.VERTICAL);
-    menuSheet.setBackgroundColor(BG);
-    menuSheet.setVisibility(View.GONE);
+    Icon x = new Icon(this, Icon.X); x.tint(DIM); x.setLayoutParams(new LinearLayout.LayoutParams(dp(44), dp(40)));
+    x.setOnClickListener(v -> dismissSheet()); head.addView(x);
+    View top = new View(this); top.setBackgroundColor(LINE);
+    sheet.addView(top, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(1)));
+    sheet.addView(head);
     FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM);
-    root.addView(menuSheet, lp);
+    root.addView(sheet, lp);
+    return sheet;
   }
-
-  TextView mrow(String label, View.OnClickListener fn) {
+  TextView row(String label, View.OnClickListener fn) { return row(label, null, fn); }
+  TextView row(String label, String sub, View.OnClickListener fn) {
     TextView tv = new TextView(this);
-    tv.setText(label);
-    tv.setTextColor(0xFFD8D8D8);
-    tv.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13.5f);
+    tv.setText(label); tv.setTextColor(0xFFFFFFFF & TEXT); tv.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
     tv.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
-    tv.setPadding(dp(18), dp(13), dp(18), dp(13));
+    tv.setPadding(dp(18), dp(14), dp(18), dp(14));
+    tv.setTextColor(TEXT);
+    if (sub != null) { tv.setText(label + "   " + sub); }
     tv.setOnClickListener(fn);
     return tv;
   }
+  TextView label(String s) { TextView tv = new TextView(this); tv.setText(s); tv.setTextColor(DIM); tv.setTextSize(TypedValue.COMPLEX_UNIT_SP, 10); tv.setLetterSpacing(.16f); tv.setPadding(dp(18), dp(14), dp(18), dp(6)); return tv; }
+  ScrollView scroller(LinearLayout content) { ScrollView sc = new ScrollView(this); sc.addView(content); return sc; }
 
-  void showMenu(boolean show) {
-    if (!show) { menuSheet.setVisibility(View.GONE); return; }
-    showTabs(false);
-    menuSheet.removeAllViews();
-    View top = new View(this);
-    top.setBackgroundColor(LINE);
-    menuSheet.addView(top, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 1));
-
-    Tab t = at();
-    boolean onPage = t != null && t.url != null && t.url.startsWith("http");
-
-    menuSheet.addView(mrow("New tab", v -> { showMenu(false); newTab(START, false); }));
-    menuSheet.addView(mrow("Speed Dial", v -> { showMenu(false); navigate(START); }));
-    if (onPage) menuSheet.addView(mrow("Share page", v -> {
-      showMenu(false);
-      Intent i = new Intent(Intent.ACTION_SEND);
-      i.setType("text/plain");
-      i.putExtra(Intent.EXTRA_TEXT, t.url);
-      startActivity(Intent.createChooser(i, "Share"));
-    }));
-    menuSheet.addView(mrow((t != null && t.desktop ? "Mobile site" : "Desktop site"), v -> {
-      showMenu(false);
-      Tab tt = at();
-      if (tt == null || tt.wv == null) return;
-      tt.desktop = !tt.desktop;
-      WebSettings ws = tt.wv.getSettings();
-      ws.setUserAgentString(tt.desktop ? defaultUA.replace("Mobile ", "").replace("Android", "X11; Linux x86_64") : null);
-      tt.wv.reload();
-    }));
-    menuSheet.addView(mrow("Ad blocker: " + (adblockOn ? "on" : "off") + "  Â·  " + adBlocked + " blocked", v -> {
-      adblockOn = !adblockOn;
-      prefs.edit().putBoolean("adblock", adblockOn).apply();
-      showMenu(true);
-    }));
-    menuSheet.addView(mrow("Search engine: " + engine()[1], v -> {
-      String k = engineKey();
-      int i = 0;
-      for (int j = 0; j < ENGINES.length; j++) if (ENGINES[j][0].equals(k)) i = j;
-      prefs.edit().putString("engine", ENGINES[(i + 1) % ENGINES.length][0]).apply();
-      showMenu(true);
-    }));
-    menuSheet.addView(mrow("Clear browsing data", v -> {
-      showMenu(false);
-      new AlertDialog.Builder(this).setMessage("Clear cookies, cache and site data?")
-        .setPositiveButton("Clear", (d, x) -> {
-          CookieManager.getInstance().removeAllCookies(null);
-          CookieManager.getInstance().flush();
-          WebStorage.getInstance().deleteAllData();
-          for (Tab tt : tabs) if (tt.wv != null) tt.wv.clearCache(true);
-          prefs.edit().remove("hosts").apply();
-          Toast.makeText(this, "Browsing data cleared", Toast.LENGTH_SHORT).show();
-        })
-        .setNegativeButton("Cancel", null).show();
-    }));
-    menuSheet.addView(mrow("About KONEKT Browser", v -> {
-      showMenu(false);
-      new AlertDialog.Builder(this)
-        .setMessage("KONEKT Browser 1.0.0 for Android\nAndroid System WebView engine\n\nkonekt-browser.vercel.app\nÂ© 2026 KONEKT Â· NKO Intl. Foundation of Technological Research & Development")
-        .setPositiveButton("OK", null).show();
-    }));
-    View pad = new View(this);
-    menuSheet.addView(pad, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(8)));
-    menuSheet.setVisibility(View.VISIBLE);
+  void showTabs() {
+    LinearLayout s = openSheet("TABS");
+    LinearLayout list = new LinearLayout(this); list.setOrientation(LinearLayout.VERTICAL);
+    TextView nt = row("+  New tab", v -> { dismissSheet(); newTab(START, false); });
+    nt.setTypeface(Typeface.DEFAULT_BOLD); list.addView(nt);
+    View sep = new View(this); sep.setBackgroundColor(LINE3); list.addView(sep, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(1)));
+    for (int i = 0; i < tabs.size(); i++) {
+      final int idx = i; Tab t = tabs.get(i);
+      LinearLayout rowv = new LinearLayout(this); rowv.setOrientation(LinearLayout.HORIZONTAL); rowv.setGravity(Gravity.CENTER_VERTICAL);
+      if (i == cur) rowv.setBackgroundColor(HOVER2);
+      LinearLayout txt = new LinearLayout(this); txt.setOrientation(LinearLayout.VERTICAL);
+      txt.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+      boolean start = t.url == null || t.url.startsWith("file:");
+      TextView title = new TextView(this); title.setText(start ? "Speed Dial" : (t.title == null || t.title.isEmpty() ? "New tab" : t.title));
+      title.setTextColor(TEXT); title.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14); title.setTypeface(Typeface.DEFAULT_BOLD); title.setSingleLine(true);
+      TextView sub = new TextView(this); sub.setText(start ? "konekt://start" : t.url); sub.setTextColor(DIM); sub.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11); sub.setSingleLine(true);
+      txt.addView(title); txt.addView(sub); txt.setPadding(dp(18), dp(11), dp(8), dp(11));
+      txt.setOnClickListener(v -> { dismissSheet(); activate(idx); });
+      rowv.addView(txt);
+      Icon cx = new Icon(this, Icon.X); cx.tint(DIM2); cx.setLayoutParams(new LinearLayout.LayoutParams(dp(44), dp(48)));
+      cx.setOnClickListener(v -> { closeTab(idx); showTabs(); });
+      rowv.addView(cx); list.addView(rowv);
+    }
+    ScrollView sc = scroller(list); sc.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(420)));
+    s.addView(sc);
   }
 
-  /* ================================================================ system plumbing */
-  @Override public void onBackPressed() {
-    if (customView != null) {
-      fsHolder.removeView(customView);
-      fsHolder.setVisibility(View.GONE);
-      customView = null;
-      if (customCb != null) { customCb.onCustomViewHidden(); customCb = null; }
-      getWindow().getDecorView().setSystemUiVisibility(0);
-      return;
+  void showMenu() {
+    LinearLayout s = openSheet("MENU");
+    LinearLayout list = new LinearLayout(this); list.setOrientation(LinearLayout.VERTICAL);
+    Tab t = at(); boolean onPage = t != null && t.url != null && t.url.startsWith("http");
+    list.addView(row("New tab", v -> { dismissSheet(); newTab(START, false); }));
+    list.addView(row("Speed Dial", v -> { dismissSheet(); navigate(START); }));
+    list.addView(row("KONEKT", v -> { dismissSheet(); openKonekt(); }));
+    if (onPage) {
+      final String pageUrl = t.url, pageTitle = t.title;
+      list.addView(row("Add to bookmarks", v -> { dismissSheet(); addBookmark(pageUrl, pageTitle); }));
+      list.addView(row("Share page", v -> { dismissSheet(); Intent i = new Intent(Intent.ACTION_SEND); i.setType("text/plain"); i.putExtra(Intent.EXTRA_TEXT, pageUrl); startActivity(Intent.createChooser(i, "Share")); }));
     }
-    if (menuSheet.getVisibility() == View.VISIBLE) { showMenu(false); return; }
-    if (tabSheet.getVisibility() == View.VISIBLE) { showTabs(false); return; }
+    list.addView(row("Bookmarks", v -> { dismissSheet(); showBookmarks(); }));
+    boolean desk = t != null && t.desktop;
+    list.addView(row(desk ? "Mobile site" : "Desktop site", v -> { dismissSheet(); toggleDesktop(); }));
+    list.addView(row("Ad blocker", (adblockOn ? "On · " + adBlocked : "Off"), v -> { adblockOn = !adblockOn; prefs.edit().putBoolean("adblock", adblockOn).apply(); dismissSheet(); Toast.makeText(this, adblockOn ? "Ad blocker on" : "Ad blocker off", Toast.LENGTH_SHORT).show(); }));
+    list.addView(label("PERSONALISE"));
+    list.addView(row("Customize appearance", v -> { dismissSheet(); showCustomize(); }));
+    list.addView(row("Settings", v -> { dismissSheet(); showSettings(); }));
+    list.addView(row("Account", v -> { dismissSheet(); showAccount(); }));
+    ScrollView sc = scroller(list); sc.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(430)));
+    s.addView(sc);
+  }
+
+  void toggleDesktop() {
+    Tab t = at(); if (t == null || t.wv == null) return;
+    t.desktop = !t.desktop;
+    t.wv.getSettings().setUserAgentString(t.desktop ? defaultUA.replace("Mobile ", "").replace("Android", "X11; Linux x86_64") : null);
+    t.wv.reload();
+  }
+
+  /* ---- bookmarks ---- */
+  void addBookmark(String u, String title) {
+    try { JSONArray a = new JSONArray(prefs.getString("bookmarks", "[]"));
+      for (int i = 0; i < a.length(); i++) if (a.getJSONObject(i).optString("u").equals(u)) { Toast.makeText(this, "Already bookmarked", Toast.LENGTH_SHORT).show(); return; }
+      JSONObject o = new JSONObject(); o.put("u", u); o.put("t", title == null ? u : title); a.put(o);
+      prefs.edit().putString("bookmarks", a.toString()).apply(); schedulePush(); Toast.makeText(this, "Bookmarked", Toast.LENGTH_SHORT).show();
+    } catch (Exception ignored) {}
+  }
+  void showBookmarks() {
+    LinearLayout s = openSheet("BOOKMARKS");
+    LinearLayout list = new LinearLayout(this); list.setOrientation(LinearLayout.VERTICAL);
+    try {
+      JSONArray a = new JSONArray(prefs.getString("bookmarks", "[]"));
+      if (a.length() == 0) { TextView e = new TextView(this); e.setText("No bookmarks yet"); e.setTextColor(DIM2); e.setPadding(dp(18), dp(30), dp(18), dp(30)); e.setGravity(Gravity.CENTER); list.addView(e); }
+      for (int i = a.length() - 1; i >= 0; i--) {
+        final JSONObject o = a.getJSONObject(i); final String u = o.optString("u");
+        LinearLayout rowv = new LinearLayout(this); rowv.setOrientation(LinearLayout.HORIZONTAL); rowv.setGravity(Gravity.CENTER_VERTICAL);
+        TextView tv = new TextView(this); tv.setText(o.optString("t", u)); tv.setTextColor(TEXT); tv.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14); tv.setSingleLine(true);
+        tv.setPadding(dp(18), dp(13), dp(8), dp(13)); tv.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        tv.setOnClickListener(v -> { dismissSheet(); newTab(u, false); });
+        Icon del = new Icon(this, Icon.X); del.tint(DIM2); del.setLayoutParams(new LinearLayout.LayoutParams(dp(44), dp(44)));
+        del.setOnClickListener(v -> { delBookmark(u); showBookmarks(); });
+        rowv.addView(tv); rowv.addView(del); list.addView(rowv);
+      }
+    } catch (Exception ignored) {}
+    ScrollView sc = scroller(list); sc.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(380)));
+    s.addView(sc);
+  }
+  void delBookmark(String u) {
+    try { JSONArray a = new JSONArray(prefs.getString("bookmarks", "[]")); JSONArray b = new JSONArray();
+      for (int i = 0; i < a.length(); i++) if (!a.getJSONObject(i).optString("u").equals(u)) b.put(a.getJSONObject(i));
+      prefs.edit().putString("bookmarks", b.toString()).apply(); schedulePush(); } catch (Exception ignored) {}
+  }
+
+  /* ---- customize (mode / accent / wallpaper) ---- */
+  void showCustomize() {
+    LinearLayout s = openSheet("CUSTOMIZE");
+    LinearLayout body = new LinearLayout(this); body.setOrientation(LinearLayout.VERTICAL);
+
+    body.addView(label("MODE"));
+    LinearLayout seg = new LinearLayout(this); seg.setOrientation(LinearLayout.HORIZONTAL); seg.setPadding(dp(14), 0, dp(14), dp(6));
+    String[][] modes = {{"dark","Dark"},{"light","Light"},{"glass","Liquid Glass"}};
+    for (String[] m : modes) {
+      final String key = m[0];
+      TextView bt = new TextView(this); bt.setText(m[1]); bt.setGravity(Gravity.CENTER); bt.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11);
+      bt.setTypeface(Typeface.DEFAULT_BOLD); bt.setAllCaps(true); bt.setPadding(dp(6), dp(11), dp(6), dp(11));
+      boolean on = mode().equals(key);
+      GradientDrawable g = new GradientDrawable(); g.setColor(0); g.setStroke(dp(1), on ? TEXT : LINE); bt.setBackground(g);
+      bt.setTextColor(on ? TEXT : DIM);
+      LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f); lp.setMargins(dp(3), 0, dp(3), 0); bt.setLayoutParams(lp);
+      bt.setOnClickListener(v -> { prefs.edit().putString("mode", key).apply(); applyAppearance(); showCustomize(); schedulePush(); });
+      seg.addView(bt);
+    }
+    body.addView(seg);
+
+    body.addView(label("ACCENT"));
+    LinearLayout sw = new LinearLayout(this); sw.setOrientation(LinearLayout.HORIZONTAL); sw.setPadding(dp(16), dp(2), dp(16), dp(10));
+    String curAcc = prefs.getString("accent", "#1d9bf0").toLowerCase();
+    for (String c : ACCENTS) {
+      View dot = new View(this); int col = parseColor(c, 0xFF1D9BF0);
+      GradientDrawable g = new GradientDrawable(); g.setShape(GradientDrawable.OVAL); g.setColor(col);
+      g.setStroke(dp(2), curAcc.equals(c) ? TEXT : 0); dot.setBackground(g);
+      LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(28), dp(28)); lp.setMargins(0, 0, dp(12), 0); dot.setLayoutParams(lp);
+      dot.setOnClickListener(v -> { prefs.edit().putString("accent", c).apply(); applyAppearance(); showCustomize(); schedulePush(); });
+      sw.addView(dot);
+    }
+    ScrollView swScroll = new ScrollView(this); // horizontal not needed; wrap
+    body.addView(sw);
+
+    body.addView(label("WALLPAPER"));
+    LinearLayout walls = new LinearLayout(this); walls.setOrientation(LinearLayout.HORIZONTAL); walls.setPadding(dp(12), dp(2), dp(12), dp(14));
+    String curW = wall();
+    for (String[] wdef : WALLS) {
+      final String key = wdef[0];
+      TextView wv = new TextView(this); wv.setText(wdef[1]); wv.setGravity(Gravity.CENTER); wv.setTextColor(0xFFFFFFFF); wv.setTextSize(TypedValue.COMPLEX_UNIT_SP, 9); wv.setAllCaps(true);
+      GradientDrawable g = wallDrawable(key); g.setStroke(dp(1), curW.equals(key) ? TEXT : LINE); wv.setBackground(g);
+      LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(46), 1f); lp.setMargins(dp(3), 0, dp(3), 0); wv.setLayoutParams(lp);
+      wv.setOnClickListener(v -> { prefs.edit().putString("wallpaper", key).apply(); applyAppearance(); showCustomize(); schedulePush(); });
+      walls.addView(wv);
+    }
+    HorizontalScrollWrap(body, walls);
+
+    ScrollView sc = scroller(body); sc.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(420)));
+    s.addView(sc);
+  }
+  void HorizontalScrollWrap(LinearLayout body, View child) { body.addView(child); }
+  GradientDrawable wallDrawable(String key) {
+    GradientDrawable g = new GradientDrawable();
+    int[] cols;
+    switch (key) {
+      case "aurora": cols = new int[]{0xFF10233b, 0xFF0a0a12}; break;
+      case "ember":  cols = new int[]{0xFF2a0f0f, 0xFF0a0708}; break;
+      case "mono":   cols = new int[]{0xFF1a1a1a, 0xFF000000}; break;
+      case "teal":   cols = new int[]{0xFF06272b, 0xFF06131a}; break;
+      case "violet": cols = new int[]{0xFF1a1040, 0xFF0a0816}; break;
+      default:       cols = new int[]{HOVER2, BG}; break;
+    }
+    g.setColors(cols); g.setGradientType(GradientDrawable.RADIAL_GRADIENT); g.setGradientRadius(dp(80));
+    return g;
+  }
+
+  /* ---- settings (engine / clear / update / about) ---- */
+  void showSettings() {
+    LinearLayout s = openSheet("SETTINGS");
+    LinearLayout body = new LinearLayout(this); body.setOrientation(LinearLayout.VERTICAL);
+    body.addView(label("SEARCH ENGINE"));
+    for (String[] e : ENGINES) {
+      final String key = e[0];
+      TextView r = row(e[1] + (engineKey().equals(key) ? "   ✓" : ""), v -> { prefs.edit().putString("engine", key).apply(); applyAppearance(); showSettings(); schedulePush(); });
+      body.addView(r);
+    }
+    body.addView(label("PRIVACY"));
+    body.addView(row("Clear browsing data", v -> {
+      new AlertDialog.Builder(this).setMessage("Clear cookies, cache and site data?")
+        .setPositiveButton("Clear", (d, x) -> {
+          CookieManager.getInstance().removeAllCookies(null); CookieManager.getInstance().flush();
+          WebStorage.getInstance().deleteAllData();
+          for (Tab tt : tabs) if (tt.wv != null) tt.wv.clearCache(true);
+          prefs.edit().remove("hosts").apply(); Toast.makeText(this, "Cleared", Toast.LENGTH_SHORT).show();
+        }).setNegativeButton("Cancel", null).show();
+    }));
+    body.addView(label("SOFTWARE"));
+    body.addView(row("Check for updates", "v" + versionName(), v -> checkUpdates()));
+    body.addView(row("About", v -> {
+      new AlertDialog.Builder(this).setMessage("KONEKT Browser " + versionName() + " for Android\nAndroid System WebView engine\n\nkonekt-browser.vercel.app\n© 2026 KONEKT · NKO Intl. Foundation of Technological Research & Development").setPositiveButton("OK", null).show();
+    }));
+    ScrollView sc = scroller(body); sc.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(430)));
+    s.addView(sc);
+  }
+  String versionName() { try { return getPackageManager().getPackageInfo(getPackageName(), 0).versionName; } catch (Exception e) { return "1.0.0"; } }
+
+  /* ---- account + sync ---- */
+  boolean create = false;
+  void showAccount() {
+    LinearLayout s = openSheet("ACCOUNT");
+    String token = prefs.getString("token", null);
+    LinearLayout body = new LinearLayout(this); body.setOrientation(LinearLayout.VERTICAL); body.setPadding(dp(18), dp(4), dp(18), dp(22));
+    if (token != null) {
+      String handle = prefs.getString("handle", ""), name = prefs.getString("name", handle);
+      TextView nm = new TextView(this); nm.setText(name); nm.setTextColor(TEXT); nm.setTextSize(TypedValue.COMPLEX_UNIT_SP, 17); nm.setTypeface(Typeface.DEFAULT_BOLD); body.addView(nm);
+      TextView hd = new TextView(this); hd.setText("@" + handle); hd.setTextColor(DIM); hd.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13); hd.setPadding(0, dp(2), 0, dp(12)); body.addView(hd);
+      TextView sy = new TextView(this); sy.setText("Bookmarks, Speed Dial and settings sync to your account."); sy.setTextColor(DIM); sy.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12); sy.setPadding(0, 0, 0, dp(14)); body.addView(sy);
+      LinearLayout r = new LinearLayout(this); r.setOrientation(LinearLayout.HORIZONTAL);
+      r.addView(pillBtn("Sync now", false, v -> { Toast.makeText(this, "Syncing…", Toast.LENGTH_SHORT).show(); doPush(); doPull(true); }));
+      r.addView(pillBtn("Sign out", true, v -> { prefs.edit().remove("token").remove("handle").remove("name").apply(); renderChrome(); dismissSheet(); Toast.makeText(this, "Signed out", Toast.LENGTH_SHORT).show(); }));
+      body.addView(r);
+      s.addView(body); return;
+    }
+    // signed out — tabs
+    LinearLayout tabsRow = new LinearLayout(this); tabsRow.setOrientation(LinearLayout.HORIZONTAL);
+    tabsRow.addView(authTab("Sign in", !create));
+    tabsRow.addView(authTab("Create account", create));
+    body.addView(tabsRow);
+    final EditText handle = field("Handle", InputType.TYPE_CLASS_TEXT);
+    final EditText name = create ? field("Display name (optional)", InputType.TYPE_CLASS_TEXT) : null;
+    final EditText pass = field("Password", InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
+    pass.setTransformationMethod(new android.text.method.PasswordTransformationMethod());
+    body.addView(handle); if (name != null) body.addView(name); body.addView(pass);
+    final TextView msg = new TextView(this); msg.setTextColor(DIM); msg.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11.5f); msg.setPadding(0, dp(6), 0, dp(8));
+    msg.setText(create ? "Handles are 3–20 chars: a–z, 0–9, underscore." : ""); body.addView(msg);
+    TextView go = pillBtn(create ? "Create account" : "Sign in", false, null); go.setBackgroundColor(TEXT); go.setTextColor(BG);
+    go.setOnClickListener(v -> {
+      String h = handle.getText().toString().trim().toLowerCase().replaceAll("^@", "");
+      String p = pass.getText().toString();
+      String nm = name != null ? name.getText().toString().trim() : "";
+      if (h.isEmpty() || p.isEmpty()) { msg.setTextColor(0xFFF4212E); msg.setText("Handle and password required"); return; }
+      msg.setTextColor(DIM); msg.setText(create ? "Creating…" : "Signing in…");
+      authRequest(create ? "register" : "login", h, p, nm, msg);
+    });
+    LinearLayout.LayoutParams glp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT); glp.setMargins(0, dp(6), 0, 0); go.setLayoutParams(glp);
+    body.addView(go);
+    s.addView(body);
+  }
+  TextView authTab(String text, boolean on) {
+    TextView tv = new TextView(this); tv.setText(text.toUpperCase()); tv.setGravity(Gravity.CENTER);
+    tv.setTextColor(on ? TEXT : DIM); tv.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11); tv.setTypeface(Typeface.DEFAULT_BOLD);
+    tv.setPadding(dp(4), dp(10), dp(4), dp(12));
+    View underline = new View(this);
+    LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f); tv.setLayoutParams(lp);
+    tv.setOnClickListener(v -> { create = text.toLowerCase().startsWith("create"); showAccount(); });
+    return tv;
+  }
+  EditText field(String hint, int type) {
+    EditText e = new EditText(this); e.setHint(hint); e.setInputType(type); e.setTextColor(TEXT); e.setHintTextColor(DIM2); e.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13); e.setSingleLine(true);
+    GradientDrawable g = new GradientDrawable(); g.setColor(0); g.setStroke(dp(1), LINE2); e.setBackground(g); e.setPadding(dp(12), dp(11), dp(12), dp(11));
+    LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT); lp.setMargins(0, dp(8), 0, 0); e.setLayoutParams(lp);
+    return e;
+  }
+  TextView pillBtn(String text, boolean danger, View.OnClickListener fn) {
+    TextView tv = new TextView(this); tv.setText(text.toUpperCase()); tv.setGravity(Gravity.CENTER); tv.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11); tv.setTypeface(Typeface.DEFAULT_BOLD);
+    tv.setPadding(dp(12), dp(12), dp(12), dp(12)); tv.setTextColor(TEXT);
+    GradientDrawable g = new GradientDrawable(); g.setColor(0); g.setStroke(dp(1), danger ? LINE2 : LINE2); tv.setBackground(g);
+    LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f); lp.setMargins(dp(3), 0, dp(3), 0); tv.setLayoutParams(lp);
+    if (fn != null) tv.setOnClickListener(fn);
+    return tv;
+  }
+
+  /* ================================================================ networking (background threads) */
+  void authRequest(final String action, final String handle, final String password, final String name, final TextView msg) {
+    new Thread(() -> {
+      try {
+        JSONObject body = new JSONObject();
+        body.put("action", action); body.put("handle", handle); body.put("password", password); if (name != null && !name.isEmpty()) body.put("name", name);
+        String resp = http("POST", API_BASE + "/api/auth", null, body.toString());
+        JSONObject j = new JSONObject(resp);
+        if (!j.optBoolean("ok")) { final String err = j.optString("error", "Failed"); ui.post(() -> { msg.setTextColor(0xFFF4212E); msg.setText(err); }); return; }
+        final String token = j.optString("token");
+        final JSONObject user = j.optJSONObject("user");
+        prefs.edit().putString("token", token).putString("handle", user.optString("handle", handle)).putString("name", user.optString("name", handle)).apply();
+        ui.post(() -> { renderChrome(); Toast.makeText(this, "Signed in as @" + handle, Toast.LENGTH_SHORT).show(); doPull(true); doPushLater(); showAccount(); });
+      } catch (Exception e) { ui.post(() -> { msg.setTextColor(0xFFF4212E); msg.setText(e.getMessage() == null ? "Network error" : e.getMessage()); }); }
+    }).start();
+  }
+
+  JSONObject collectData() {
+    JSONObject d = new JSONObject();
+    try {
+      d.put("bookmarks", new JSONArray(prefs.getString("bookmarks", "[]")));
+      d.put("dials", new JSONArray(prefs.getString("dials", "[]")));
+      JSONObject st = new JSONObject(); st.put("engine", engineKey()); st.put("adblock", adblockOn); d.put("settings", st);
+      JSONObject ap = new JSONObject(); ap.put("mode", mode()); ap.put("accent", prefs.getString("accent", "#1d9bf0")); ap.put("wallpaper", wall()); d.put("appearance", ap);
+    } catch (Exception ignored) {}
+    return d;
+  }
+  void mergeIn(JSONObject d) {
+    if (d == null) return;
+    try {
+      SharedPreferences.Editor ed = prefs.edit();
+      if (d.has("bookmarks")) ed.putString("bookmarks", d.getJSONArray("bookmarks").toString());
+      if (d.has("dials")) ed.putString("dials", d.getJSONArray("dials").toString());
+      if (d.has("settings")) { JSONObject st = d.getJSONObject("settings"); if (st.has("engine")) ed.putString("engine", st.getString("engine")); if (st.has("adblock")) ed.putBoolean("adblock", st.getBoolean("adblock")); }
+      if (d.has("appearance")) { JSONObject ap = d.getJSONObject("appearance"); if (ap.has("mode")) ed.putString("mode", ap.getString("mode")); if (ap.has("accent")) ed.putString("accent", ap.getString("accent")); if (ap.has("wallpaper")) ed.putString("wallpaper", ap.getString("wallpaper")); }
+      ed.apply();
+      adblockOn = prefs.getBoolean("adblock", true);
+    } catch (Exception ignored) {}
+  }
+  void doPull(final boolean apply) {
+    final String token = prefs.getString("token", null); if (token == null) return;
+    new Thread(() -> {
+      try {
+        String resp = http("GET", API_BASE + "/api/sync", token, null);
+        JSONObject j = new JSONObject(resp);
+        if (j.optBoolean("ok")) { final JSONObject data = j.optJSONObject("data");
+          ui.post(() -> { mergeIn(data); if (apply) applyAppearance(); Toast.makeText(this, "Synced", Toast.LENGTH_SHORT).show(); }); }
+      } catch (Exception ignored) {}
+    }).start();
+  }
+  void schedulePush() { if (prefs.getString("token", null) == null) return; doPushLater(); }
+  void doPushLater() {
+    if (pushPending != null) ui.removeCallbacks(pushPending);
+    pushPending = this::doPush;
+    ui.postDelayed(pushPending, 1400);
+  }
+  void doPush() {
+    final String token = prefs.getString("token", null); if (token == null) return;
+    final String payload;
+    try { JSONObject body = new JSONObject(); body.put("data", collectData()); payload = body.toString(); } catch (Exception e) { return; }
+    new Thread(() -> { try { http("PUT", API_BASE + "/api/sync", token, payload); } catch (Exception ignored) {} }).start();
+  }
+
+  void checkUpdates() {
+    Toast.makeText(this, "Checking for updates…", Toast.LENGTH_SHORT).show();
+    new Thread(() -> {
+      try {
+        String resp = http("GET", "https://api.github.com/repos/" + REPO + "/releases/latest", null, null);
+        JSONObject j = new JSONObject(resp);
+        final String latest = j.optString("tag_name", j.optString("name", ""));
+        final String cur = versionName();
+        ui.post(() -> {
+          if (isNewer(latest, cur)) {
+            new AlertDialog.Builder(this).setTitle("Update available")
+              .setMessage("Version " + latest + " is available (you have " + cur + ").")
+              .setPositiveButton("Get it", (d, x) -> newTab(RELEASES, false))
+              .setNegativeButton("Later", null).show();
+          } else {
+            Toast.makeText(this, "You're on the latest version (" + cur + ")", Toast.LENGTH_LONG).show();
+          }
+        });
+      } catch (Exception e) { ui.post(() -> Toast.makeText(this, "Couldn't check for updates", Toast.LENGTH_SHORT).show()); }
+    }).start();
+  }
+  boolean isNewer(String a, String b) {
+    int[] A = ver(a), B = ver(b);
+    for (int i = 0; i < 3; i++) { if (A[i] > B[i]) return true; if (A[i] < B[i]) return false; }
+    return false;
+  }
+  int[] ver(String v) {
+    int[] out = {0, 0, 0}; if (v == null) return out; v = v.replaceAll("^v", "");
+    String[] p = v.split("\\."); for (int i = 0; i < 3 && i < p.length; i++) { try { out[i] = Integer.parseInt(p[i].replaceAll("[^0-9]", "")); } catch (Exception e) {} }
+    return out;
+  }
+
+  String http(String method, String urlStr, String token, String body) throws Exception {
+    HttpURLConnection c = (HttpURLConnection) new URL(urlStr).openConnection();
+    c.setRequestMethod(method);
+    c.setConnectTimeout(12000); c.setReadTimeout(12000);
+    c.setRequestProperty("Accept", "application/json");
+    c.setRequestProperty("User-Agent", "KONEKT-Browser-Android");
+    if (token != null) c.setRequestProperty("Authorization", "Bearer " + token);
+    if (body != null) {
+      c.setDoOutput(true); c.setRequestProperty("Content-Type", "application/json");
+      OutputStream os = c.getOutputStream(); os.write(body.getBytes("UTF-8")); os.close();
+    }
+    int code = c.getResponseCode();
+    java.io.InputStream in = code >= 200 && code < 400 ? c.getInputStream() : c.getErrorStream();
+    java.io.ByteArrayOutputStream bo = new java.io.ByteArrayOutputStream();
+    if (in != null) { byte[] buf = new byte[4096]; int n; while ((n = in.read(buf)) > 0) bo.write(buf, 0, n); }
+    return bo.toString("UTF-8");
+  }
+
+  /* ================================================================ system */
+  @Override public void onBackPressed() {
+    if (customView != null) { exitFullscreen(); return; }
+    if (sheet != null) { dismissSheet(); return; }
     Tab t = at();
     if (t != null && t.wv != null && t.wv.canGoBack()) { t.wv.goBack(); return; }
     if (tabs.size() > 1) { closeTab(cur); return; }
     moveTaskToBack(true);
   }
-
   @Override protected void onActivityResult(int req, int res, Intent data) {
     super.onActivityResult(req, res, data);
-    if (req == 73 && fileCb != null) {
-      fileCb.onReceiveValue(WebChromeClient.FileChooserParams.parseResult(res, data));
-      fileCb = null;
-    }
+    if (req == 73 && fileCb != null) { fileCb.onReceiveValue(WebChromeClient.FileChooserParams.parseResult(res, data)); fileCb = null; }
   }
-
   @Override public void onRequestPermissionsResult(int req, String[] perms, int[] grants) {
     super.onRequestPermissionsResult(req, perms, grants);
     boolean ok = grants.length > 0 && grants[0] == PackageManager.PERMISSION_GRANTED;
-    if (req == 71 && geoCb != null) {
-      geoCb.invoke(geoOrigin, ok, ok);
-      geoCb = null;
-    } else if (req == 72 && mediaReq != null) {
-      boolean all = true;
-      for (int g : grants) if (g != PackageManager.PERMISSION_GRANTED) all = false;
-      if (all) mediaReq.grant(mediaReq.getResources()); else mediaReq.deny();
-      mediaReq = null;
-    }
+    if (req == 71 && geoCb != null) { geoCb.invoke(geoOrigin, ok, ok); geoCb = null; }
+    else if (req == 72 && mediaReq != null) { boolean all = grants.length > 0; for (int g : grants) if (g != PackageManager.PERMISSION_GRANTED) all = false; if (all) mediaReq.grant(mediaReq.getResources()); else mediaReq.deny(); mediaReq = null; }
   }
+  @Override protected void onPause() { super.onPause(); saveSession(); CookieManager.getInstance().flush(); Tab t = at(); if (t != null && t.wv != null) t.wv.onPause(); }
+  @Override protected void onResume() { super.onResume(); Tab t = at(); if (t != null && t.wv != null) t.wv.onResume(); }
 
-  @Override protected void onPause() {
-    super.onPause();
-    saveSession();
-    CookieManager.getInstance().flush();
-    Tab t = at();
-    if (t != null && t.wv != null) t.wv.onPause();
-  }
-
-  @Override protected void onResume() {
-    super.onResume();
-    Tab t = at();
-    if (t != null && t.wv != null) t.wv.onResume();
-  }
-
-  /* ================================================================ stroke icons (KONEKT style) */
+  /* ================================================================ stroke icons */
   static class Icon extends View {
-    static final int BACK = 0, FWD = 1, GLOBE = 2, TABS = 3, MENU = 4, X = 5, RELOAD = 6, LOCK = 7, UNLOCK = 8;
-    int type;
-    int count = 0;
+    static final int BACK = 0, FWD = 1, GLOBE = 2, TABS = 3, MENU = 4, X = 5, RELOAD = 6, LOCK = 7, UNLOCK = 8, PERSON = 9, PERSON_ON = 10;
+    int type; int count = 0; int col = 0xFFD8D8D8;
     final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
     final Paint tp = new Paint(Paint.ANTI_ALIAS_FLAG);
-
-    Icon(Context c, int t) {
-      super(c);
-      type = t;
-      p.setStyle(Paint.Style.STROKE);
-      p.setStrokeCap(Paint.Cap.ROUND);
-      p.setStrokeJoin(Paint.Join.ROUND);
-      p.setColor(0xFFD8D8D8);
-      tp.setColor(0xFFD8D8D8);
-      tp.setTextAlign(Paint.Align.CENTER);
-      tp.setTypeface(Typeface.DEFAULT_BOLD);
-      setClickable(true);
-    }
-
+    Icon(Context c, int t) { super(c); type = t;
+      p.setStyle(Paint.Style.STROKE); p.setStrokeCap(Paint.Cap.ROUND); p.setStrokeJoin(Paint.Join.ROUND); p.setColor(col);
+      tp.setColor(col); tp.setTextAlign(Paint.Align.CENTER); tp.setTypeface(Typeface.DEFAULT_BOLD); setClickable(true); }
     void setType(int t) { type = t; invalidate(); }
     void setCount(int n) { count = n; invalidate(); }
-
+    void tint(int c) { col = c; p.setColor(c); tp.setColor(c); invalidate(); }
     @Override public boolean onTouchEvent(MotionEvent e) {
-      if (e.getAction() == MotionEvent.ACTION_DOWN) setAlpha(getAlpha() * 0.55f);
-      if (e.getAction() == MotionEvent.ACTION_UP || e.getAction() == MotionEvent.ACTION_CANCEL)
-        setAlpha(Math.min(1f, getAlpha() / 0.55f));
+      if (e.getAction() == MotionEvent.ACTION_DOWN) setAlpha(getAlpha() * .5f);
+      if (e.getAction() == MotionEvent.ACTION_UP || e.getAction() == MotionEvent.ACTION_CANCEL) setAlpha(Math.min(1f, getAlpha() / .5f));
       return super.onTouchEvent(e);
     }
-
-    float dpf(float v) { return TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, v, getResources().getDisplayMetrics()); }
-
+    float u() { return TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 1, getResources().getDisplayMetrics()); }
     @Override protected void onDraw(Canvas c) {
-      float w = getWidth(), h = getHeight(), cx = w / 2f, cy = h / 2f, u = dpf(1);
-      p.setStrokeWidth(1.8f * u);
+      float w = getWidth(), h = getHeight(), cx = w / 2f, cy = h / 2f, u = u();
+      p.setStrokeWidth(1.85f * u);
       switch (type) {
-        case BACK:
-          c.drawLine(cx + 4 * u, cy - 7 * u, cx - 4 * u, cy, p);
-          c.drawLine(cx - 4 * u, cy, cx + 4 * u, cy + 7 * u, p);
-          break;
-        case FWD:
-          c.drawLine(cx - 4 * u, cy - 7 * u, cx + 4 * u, cy, p);
-          c.drawLine(cx + 4 * u, cy, cx - 4 * u, cy + 7 * u, p);
-          break;
-        case GLOBE: {
-          float r = 8.2f * u;
-          p.setStrokeWidth(1.6f * u);
-          c.drawCircle(cx, cy, r, p);
-          c.drawOval(new RectF(cx - r * 0.42f, cy - r, cx + r * 0.42f, cy + r), p);
-          c.drawLine(cx - r, cy, cx + r, cy, p);
-          c.drawLine(cx - r * 0.87f, cy - r * 0.46f, cx + r * 0.87f, cy - r * 0.46f, p);
-          c.drawLine(cx - r * 0.87f, cy + r * 0.46f, cx + r * 0.87f, cy + r * 0.46f, p);
-          break;
-        }
-        case TABS: {
-          float s = 8 * u;
-          c.drawRect(cx - s, cy - s, cx + s, cy + s, p);
-          if (count > 0) {
-            tp.setTextSize(9.5f * u);
-            c.drawText(count > 99 ? "99" : String.valueOf(count), cx, cy + 3.4f * u, tp);
-          }
-          break;
-        }
-        case MENU:
-          p.setStrokeWidth(2.2f * u);
-          c.drawPoint(cx, cy - 6 * u, p);
-          c.drawPoint(cx, cy, p);
-          c.drawPoint(cx, cy + 6 * u, p);
-          break;
-        case X:
-          c.drawLine(cx - 5 * u, cy - 5 * u, cx + 5 * u, cy + 5 * u, p);
-          c.drawLine(cx + 5 * u, cy - 5 * u, cx - 5 * u, cy + 5 * u, p);
-          break;
-        case RELOAD: {
-          float r = 7 * u;
-          RectF o = new RectF(cx - r, cy - r, cx + r, cy + r);
-          c.drawArc(o, -50, 300, false, p);
-          c.drawLine(cx + r * 0.55f, cy - r * 1.15f, cx + r * 0.72f, cy - r * 0.55f, p);
-          c.drawLine(cx + r * 0.72f, cy - r * 0.55f, cx + r * 0.1f, cy - r * 0.5f, p);
-          break;
-        }
-        case LOCK: {
-          float bw = 6.5f * u, bh = 5.5f * u;
-          c.drawRect(cx - bw, cy - 1 * u, cx + bw, cy + bh + 1 * u, p);
-          RectF arc = new RectF(cx - 4 * u, cy - 8 * u, cx + 4 * u, cy + 1 * u);
-          c.drawArc(arc, 180, 180, false, p);
-          break;
-        }
-        case UNLOCK: {
-          float bw = 6.5f * u, bh = 5.5f * u;
-          c.drawRect(cx - bw, cy - 1 * u, cx + bw, cy + bh + 1 * u, p);
-          RectF arc = new RectF(cx - 4 * u, cy - 8 * u, cx + 4 * u, cy + 1 * u);
-          c.drawArc(arc, 180, 120, false, p);
-          break;
-        }
+        case BACK: c.drawLine(cx + 4 * u, cy - 7 * u, cx - 4 * u, cy, p); c.drawLine(cx - 4 * u, cy, cx + 4 * u, cy + 7 * u, p); break;
+        case FWD:  c.drawLine(cx - 4 * u, cy - 7 * u, cx + 4 * u, cy, p); c.drawLine(cx + 4 * u, cy, cx - 4 * u, cy + 7 * u, p); break;
+        case GLOBE: { float r = 8.2f * u; p.setStrokeWidth(1.6f * u); c.drawCircle(cx, cy, r, p);
+          c.drawOval(new RectF(cx - r * .42f, cy - r, cx + r * .42f, cy + r), p); c.drawLine(cx - r, cy, cx + r, cy, p);
+          c.drawLine(cx - r * .87f, cy - r * .46f, cx + r * .87f, cy - r * .46f, p); c.drawLine(cx - r * .87f, cy + r * .46f, cx + r * .87f, cy + r * .46f, p); break; }
+        case TABS: { float s = 8 * u; c.drawRect(cx - s, cy - s, cx + s, cy + s, p);
+          if (count > 0) { tp.setTextSize(9.5f * u); c.drawText(count > 99 ? "99" : String.valueOf(count), cx, cy + 3.4f * u, tp); } break; }
+        case MENU: p.setStrokeWidth(2.2f * u); c.drawLine(cx - 8 * u, cy - 5 * u, cx + 8 * u, cy - 5 * u, p); c.drawLine(cx - 8 * u, cy, cx + 8 * u, cy, p); c.drawLine(cx - 8 * u, cy + 5 * u, cx + 8 * u, cy + 5 * u, p); break;
+        case X: c.drawLine(cx - 5 * u, cy - 5 * u, cx + 5 * u, cy + 5 * u, p); c.drawLine(cx + 5 * u, cy - 5 * u, cx - 5 * u, cy + 5 * u, p); break;
+        case RELOAD: { float r = 7 * u; RectF o = new RectF(cx - r, cy - r, cx + r, cy + r); c.drawArc(o, -50, 300, false, p);
+          c.drawLine(cx + r * .55f, cy - r * 1.15f, cx + r * .72f, cy - r * .55f, p); c.drawLine(cx + r * .72f, cy - r * .55f, cx + r * .1f, cy - r * .5f, p); break; }
+        case LOCK: { float bw = 6.5f * u, bh = 5.5f * u; c.drawRect(cx - bw, cy - 1 * u, cx + bw, cy + bh + 1 * u, p);
+          c.drawArc(new RectF(cx - 4 * u, cy - 8 * u, cx + 4 * u, cy + 1 * u), 180, 180, false, p); break; }
+        case UNLOCK: { float bw = 6.5f * u, bh = 5.5f * u; c.drawRect(cx - bw, cy - 1 * u, cx + bw, cy + bh + 1 * u, p);
+          c.drawArc(new RectF(cx - 4 * u, cy - 8 * u, cx + 4 * u, cy + 1 * u), 180, 120, false, p); break; }
+        case PERSON: case PERSON_ON: { float r = 3.6f * u; c.drawCircle(cx, cy - 3 * u, r, p);
+          c.drawArc(new RectF(cx - 7 * u, cy + 1 * u, cx + 7 * u, cy + 13 * u), 180, 180, false, p);
+          if (type == PERSON_ON) { p.setStyle(Paint.Style.FILL); c.drawCircle(cx + 6 * u, cy - 6 * u, 2.4f * u, p); p.setStyle(Paint.Style.STROKE); } break; }
       }
     }
   }

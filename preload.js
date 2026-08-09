@@ -12,6 +12,7 @@ const SEND = new Set([
   'shell-open',      // path — open with default app
   'win-fullscreen',  // toggle window fullscreen (F11)
   'set-theme',       // { dark } — recolour the native window buttons
+  'set-material',    // { glass } — Windows acrylic for Liquid Glass mode
   'clear-data',      // wipe cookies/storage/cache of the web partition
   'adblock-set',     // { on } — toggle the built-in ad/tracker blocker
   'chrome-ready'     // chrome finished booting (smoke mode waits for this)

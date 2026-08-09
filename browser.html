@@ -328,6 +328,120 @@ button.set-row:hover{background:var(--hover)}
 .toast{background:var(--bg);border:1px solid var(--line);padding:10px 16px;font-size:12.5px;font-weight:600;
   max-width:340px;animation:tin .18s ease-out}
 @keyframes tin{from{transform:translateY(8px);opacity:0}to{transform:none;opacity:1}}
+
+/* ============================= APPEARANCE / LIQUID GLASS ============================= */
+/* wallpaper sits on the body; the start page and (in glass) the chrome let it show */
+body{background-color:var(--bg);background-image:var(--wall,none);background-size:cover;background-position:center;background-attachment:fixed}
+:root{--glass-blur:26px;--glass-bg:rgba(20,20,26,.55);--glass-brd:rgba(255,255,255,.10)}
+:root[data-theme="light"]{--glass-bg:rgba(250,250,252,.6);--glass-brd:rgba(0,0,0,.08)}
+
+/* compact density trims the chrome for power users */
+:root[data-density="compact"]{--cap:32px;--bar:40px}
+[data-density="compact"] .nav-item,[data-density="compact"] .set-row{padding-top:8px;padding-bottom:8px}
+[data-density="compact"] .p-row{padding-top:5px;padding-bottom:5px}
+
+/* accent-driven touches (Opera-style single accent) */
+#omni:focus-within{border-color:var(--accent)}
+.sbtn.on::before{background:var(--accent)}
+.pbtn.solid,.err-card button,.dl .da.solid{background:var(--accent);border-color:var(--accent);color:#fff}
+.auth-sub.on{color:var(--accent)}
+.acc-dot{background:var(--accent)}
+
+/* Liquid Glass — frosted translucent chrome floating over the wallpaper.
+   Tabs (webviews) stay opaque; the glass reads on the chrome and start page. */
+[data-appearance="glass"] #cap,
+[data-appearance="glass"] #bar,
+[data-appearance="glass"] #side,
+[data-appearance="glass"] #kpanel,
+[data-appearance="glass"] .panel,
+[data-appearance="glass"] #menu,
+[data-appearance="glass"] .modal,
+[data-appearance="glass"] #findbar,
+[data-appearance="glass"] #permbar,
+[data-appearance="glass"] .toast,
+[data-appearance="glass"] #omni{
+  background:var(--glass-bg);
+  -webkit-backdrop-filter:blur(var(--glass-blur)) saturate(1.7);
+  backdrop-filter:blur(var(--glass-blur)) saturate(1.7);
+}
+[data-appearance="glass"] #cap,[data-appearance="glass"] #bar{border-bottom:1px solid var(--glass-brd)}
+[data-appearance="glass"] #side{border-right:1px solid var(--glass-brd)}
+[data-appearance="glass"] .panel,[data-appearance="glass"] #kpanel{border-left:1px solid var(--glass-brd)}
+[data-appearance="glass"] #menu,[data-appearance="glass"] .modal,[data-appearance="glass"] #findbar{
+  border:1px solid var(--glass-brd);
+  box-shadow:0 1px 0 rgba(255,255,255,.14) inset, 0 20px 60px rgba(0,0,0,.5);
+}
+[data-appearance="glass"] #omni{border:1px solid var(--glass-brd)}
+[data-appearance="glass"] .nbtn:hover,[data-appearance="glass"] .sbtn:hover,
+[data-appearance="glass"] .set-row:hover,[data-appearance="glass"] .m-row:hover,
+[data-appearance="glass"] .p-row:hover{background:rgba(255,255,255,.09)}
+[data-appearance="glass"] #stage{background:transparent}
+[data-appearance="glass"] #start{background:transparent}
+[data-appearance="glass"] .st-tile,[data-appearance="glass"] .st-search{
+  background:rgba(255,255,255,.05);
+  -webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);
+  border-color:var(--glass-brd)}
+[data-appearance="glass"] .tab.on{background:rgba(255,255,255,.10)}
+
+/* start page shows the wallpaper regardless of glass */
+#start{background-color:var(--bg)}
+[data-wall-on="1"] #start{background-color:transparent}
+
+/* ============================= APPEARANCE PICKERS (in Settings) ============================= */
+.seg{display:flex;gap:6px;padding:6px 16px 12px}
+.seg button{flex:1;padding:9px 6px;border:1px solid var(--line);background:none;color:var(--dim);
+  font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;font-family:var(--font)}
+.seg button.on{border-color:var(--text);color:var(--text)}
+.seg button:hover{color:var(--text)}
+.swatches{display:flex;gap:10px;flex-wrap:wrap;padding:6px 16px 14px}
+.sw{width:26px;height:26px;border-radius:50%;border:2px solid transparent;cursor:pointer;position:relative}
+.sw.on{border-color:var(--text)}
+.sw.on::after{content:'';position:absolute;inset:3px;border-radius:50%;border:2px solid var(--bg)}
+.walls{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:6px 16px 14px}
+.wall{height:46px;border:1px solid var(--line);cursor:pointer;position:relative;overflow:hidden}
+.wall.on{border-color:var(--text);outline:1px solid var(--text)}
+.wall span{position:absolute;left:6px;bottom:4px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#fff;text-shadow:0 1px 2px #000}
+
+/* ============================= ACCOUNT ============================= */
+.acc-dot{width:8px;height:8px;border-radius:50%;position:absolute;top:6px;right:6px;display:none}
+#sAcct.signed .acc-dot{display:block}
+#sAcct .acc-ini{font-size:12px;font-weight:800;color:var(--text)}
+#acctShade{position:absolute;inset:0;background:rgba(0,0,0,.6);z-index:100;display:none;
+  align-items:flex-start;justify-content:center;padding:7vh 20px}
+:root[data-theme="light"] #acctShade{background:rgba(0,0,0,.35)}
+#acctShade.open{display:flex}
+.acc-modal{width:min(400px,100%);background:var(--bg);border:1px solid var(--line);display:flex;flex-direction:column}
+.acc-head{display:flex;align-items:center;padding:16px 18px 4px}
+.acc-head .lg{font-size:22px}
+.acc-head .p-x{margin-left:auto}
+.acc-tag{font-size:9.5px;text-transform:uppercase;letter-spacing:.16em;color:var(--dim);font-weight:500;padding:0 18px 14px}
+.auth-tabs{display:flex;border-bottom:1px solid var(--line-3);margin:0 0 4px}
+.auth-sub{flex:1;padding:12px;background:none;border:0;border-bottom:2px solid transparent;color:var(--dim);
+  font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;font-family:var(--font)}
+.auth-sub.on{color:var(--text);border-bottom-color:var(--text)}
+.auth-form{padding:14px 18px 20px;display:flex;flex-direction:column;gap:10px}
+.auth-form input{background:none;border:1px solid var(--line-2);color:var(--text);font-size:13px;
+  padding:11px 12px;outline:0}
+.auth-form input:focus{border-color:var(--text)}
+.auth-msg{font-size:11.5px;min-height:15px}
+.auth-msg.err{color:var(--danger)}
+.auth-msg.ok{color:var(--ok)}
+.auth-go{background:var(--text);color:var(--bg);border:1px solid var(--text);padding:12px;font-size:11px;
+  font-weight:800;text-transform:uppercase;letter-spacing:.1em;font-family:var(--font)}
+.auth-go:hover{background:var(--btn-h)}
+.auth-go:disabled{opacity:.5}
+.acc-me{padding:8px 18px 20px;display:flex;flex-direction:column;gap:4px}
+.acc-me .who{display:flex;align-items:center;gap:12px;padding:8px 0 14px}
+.acc-me .av{width:44px;height:44px;border:1px solid var(--line);display:flex;align-items:center;justify-content:center;
+  font-size:18px;font-weight:800}
+.acc-me .nm{font-size:15px;font-weight:800}
+.acc-me .hd{font-size:12px;color:var(--dim)}
+.acc-me .syncline{font-size:11.5px;color:var(--dim);padding:8px 0}
+.acc-row{display:flex;gap:8px;margin-top:6px}
+.acc-row button{flex:1;padding:11px;border:1px solid var(--line-2);background:none;color:var(--text);
+  font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;font-family:var(--font)}
+.acc-row button:hover{background:var(--hover-2)}
+.acc-row button.danger:hover{border-color:var(--danger);color:var(--danger)}
 </style>
 </head>
 <body>
@@ -372,6 +486,7 @@ button.set-row:hover{background:var(--hover)}
   <span class="s-sp"></span>
   <button class="sbtn" id="sShield" title="Ad &amp; tracker blocker"></button>
   <button class="sbtn" id="sSet" title="Settings"></button>
+  <button class="sbtn" id="sAcct" title="Account"></button>
 </div>
 
 <div id="kpanel">
@@ -418,6 +533,13 @@ button.set-row:hover{background:var(--hover)}
     </div>
   </div>
 
+  <div id="acctShade">
+    <div class="acc-modal">
+      <div class="acc-head"><span id="acctLogo"></span><button class="p-x" id="acctX"></button></div>
+      <div id="acctBody"></div>
+    </div>
+  </div>
+
   <div id="status"></div>
   <div id="toasts"></div>
 </div>
@@ -430,6 +552,7 @@ button.set-row:hover{background:var(--hover)}
    ================================================================ */
 const bridge = window.konektBridge;
 const $ = s => document.querySelector(s);
+const $$ = s => document.querySelectorAll(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const START = 'konekt://start';
 const PARTITION = 'persist:konekt';
@@ -461,6 +584,7 @@ function ic(name, size){
     print:'M7 8V3h10v5M5 8h14v8h-3v5H8v-5H5zM8 16h8',
     code:'M8 6 3 12l5 6M16 6l5 6-5 6',
     home:'M4 11l8-7 8 7M6.5 9.6V20h11V9.6',
+    user:'M12 12.4a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM5 20c.6-3.4 3.3-5.4 7-5.4s6.4 2 7 5.4',
     shield:'M12 3l7 2.6v5.1c0 4.6-2.9 8.5-7 10.3-4.1-1.8-7-5.7-7-10.3V5.6z',
     out:'M13 5h6v6M19 5l-9 9M9 6H5v13h13v-4',
     pip:'M3 6h18v12H3zM12 12h7v5h-7z',
@@ -502,9 +626,26 @@ function logoLong(fs){
 
 /* ---------------------- storage ---------------------- */
 function load(k, d){ try { const v = JSON.parse(localStorage.getItem(k)); return v == null ? d : v; } catch { return d; } }
-function save(k, v){ try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }
+function save(k, v){ try { localStorage.setItem(k, JSON.stringify(v)); } catch {} if (window.kbOnSave) window.kbOnSave(k); }
 
-const settings = Object.assign({ engine:'google', theme:'dark', restore:true, homepage:'', adblock:true, kpanel:false }, load('kb.settings', {}));
+const settings = Object.assign({
+  engine:'google', theme:'dark', restore:true, homepage:'', adblock:true, kpanel:false,
+  /* appearance / Opera-style customization */
+  mode:'dark', accent:'#1d9bf0', wallpaper:'', density:'cozy'
+}, load('kb.settings', {}));
+/* migrate the old light/dark theme flag into the richer mode */
+if (!load('kb.settings', {}).mode && settings.theme) settings.mode = settings.theme === 'light' ? 'light' : 'dark';
+
+/* preset wallpapers for glass / start page (pure CSS, no assets) */
+const WALLS = {
+  none:   '',
+  aurora: 'radial-gradient(120% 120% at 20% 0%, #10233b 0%, #0a0a12 45%, #000 100%), radial-gradient(90% 90% at 100% 100%, #241033 0%, transparent 60%)',
+  ember:  'radial-gradient(120% 120% at 0% 0%, #2a0f0f 0%, #0a0708 45%, #000 100%), radial-gradient(90% 90% at 100% 30%, #3a1d05 0%, transparent 60%)',
+  mono:   'radial-gradient(120% 120% at 50% 0%, #1a1a1a 0%, #0a0a0a 50%, #000 100%)',
+  teal:   'radial-gradient(120% 120% at 15% 10%, #06272b 0%, #06131a 45%, #000 100%), radial-gradient(80% 80% at 100% 100%, #0b3a2e 0%, transparent 60%)',
+  violet: 'radial-gradient(120% 120% at 80% 0%, #1a1040 0%, #0a0816 45%, #000 100%), radial-gradient(90% 90% at 0% 100%, #3a0f36 0%, transparent 60%)'
+};
+const ACCENTS = ['#1d9bf0','#00ba7c','#f91880','#ffd400','#a970ff','#ff6a00','#ffffff'];
 let bookmarks = load('kb.bookmarks', []);       // [{u,t,ts}]
 let history   = load('kb.history', []);         // [{u,t,ts}] newest last
 let closed    = load('kb.closed', []);          // recently closed urls
@@ -1163,14 +1304,34 @@ async function openSettings(){
   $('#setBody').innerHTML =
     '<div class="set-h">Search engine</div>'
     + Object.keys(ENGINES).map(eng).join('')
-    + '<div class="set-h">Appearance</div>'
-    + '<button class="set-row" data-set="theme">Theme<span class="sr">'+(settings.theme === 'dark' ? 'Dark' : 'Light')+'</span></button>'
+    + '<div class="set-h">Account</div>'
+    + '<button class="set-row" data-set="account">'+(account ? esc(account.name || ('@'+account.handle)) : 'Sign in or create account')
+      + '<span class="sr">'+(account ? 'Signed in · syncing' : 'Sync across devices')+'</span></button>'
+    + '<div class="set-h">Appearance — Mode</div>'
+    + '<div class="seg" id="modeSeg">'
+      + ['dark','light','glass'].map(m => '<button data-mode="'+m+'"'+(settings.mode===m?' class="on"':'')+'>'
+        + (m==='glass'?'Liquid Glass':m[0].toUpperCase()+m.slice(1))+'</button>').join('')
+    + '</div>'
+    + '<div class="set-h">Accent</div>'
+    + '<div class="swatches">'
+      + ACCENTS.map(c => '<span class="sw'+(String(settings.accent).toLowerCase()===c?' on':'')+'" data-accent="'+c+'" style="background:'+c+'"></span>').join('')
+    + '</div>'
+    + '<div class="set-h">Wallpaper</div>'
+    + '<div class="walls">'
+      + Object.keys(WALLS).map(k => '<div class="wall'+((settings.wallpaper||'none')===k?' on':'')+'" data-wall="'+k+'" '
+        + 'style="background:'+(WALLS[k]||'var(--hover-2)')+';background-size:cover"><span>'+k+'</span></div>').join('')
+    + '</div>'
+    + '<div class="set-h">Layout</div>'
+    + '<button class="set-row" data-set="density">Density<span class="sr">'+(settings.density==='compact'?'Compact':'Cozy')+'</span></button>'
     + '<div class="set-h">On start</div>'
     + '<button class="set-row" data-set="restore">Reopen previous tabs<span class="sr">'+(settings.restore ? 'On' : 'Off')+'</span></button>'
     + '<div class="set-h">Privacy</div>'
     + '<button class="set-row" data-set="adblock">Ad &amp; tracker blocker<span class="sr">'+(settings.adblock !== false ? 'On' : 'Off')+'</span></button>'
     + '<button class="set-row" data-set="clear"><span class="set-danger">Clear browsing data</span></button>'
     + '<div class="set-note">Wipes cookies, site storage and cache for every site, plus the local history list. Bookmarks stay.</div>'
+    + '<div class="set-h">Software</div>'
+    + '<button class="set-row" data-set="update">Check for updates<span class="sr">v'+esc(info.version || '')+'</span></button>'
+    + '<div class="set-note" id="updLine">Downloads the latest release from GitHub if a newer version exists.</div>'
     + '<div class="set-h">About</div>'
     + '<div class="about"><b>KONEKT Browser</b> '+esc(info.version || '')
     + '<br>Chromium '+esc(info.chrome || '?')+' · Electron '+esc(info.electron || '?')+' · Node '+esc(info.node || '?')
@@ -1181,9 +1342,18 @@ async function openSettings(){
 $('#setBody').addEventListener('click', e => {
   const engB = e.target.closest('[data-eng]');
   if (engB){ settings.engine = engB.dataset.eng; saveSettings(); openSettings(); renderStart(); return; }
+  const modeB = e.target.closest('[data-mode]');
+  if (modeB){ settings.mode = modeB.dataset.mode; applyTheme(); saveSettings(); openSettings(); renderStart(); return; }
+  const accB = e.target.closest('[data-accent]');
+  if (accB){ settings.accent = accB.dataset.accent; applyTheme(); saveSettings(); openSettings(); return; }
+  const wallB = e.target.closest('[data-wall]');
+  if (wallB){ settings.wallpaper = wallB.dataset.wall === 'none' ? '' : wallB.dataset.wall; applyTheme(); saveSettings(); openSettings(); renderStart(); return; }
   const b = e.target.closest('[data-set]');
   if (!b) return;
-  if (b.dataset.set === 'theme'){ settings.theme = settings.theme === 'dark' ? 'light' : 'dark'; applyTheme(); saveSettings(); openSettings(); }
+  if (b.dataset.set === 'account'){ $('#shade').classList.remove('open'); openAccount(); return; }
+  else if (b.dataset.set === 'update'){ checkUpdates(); return; }
+  else if (b.dataset.set === 'density'){ settings.density = settings.density === 'compact' ? 'cozy' : 'compact'; applyTheme(); saveSettings(); openSettings(); }
+  else if (b.dataset.set === 'theme'){ settings.mode = settings.mode === 'light' ? 'dark' : 'light'; applyTheme(); saveSettings(); openSettings(); }
   else if (b.dataset.set === 'adblock'){
     settings.adblock = settings.adblock === false;
     saveSettings();
@@ -1200,8 +1370,23 @@ $('#setBody').addEventListener('click', e => {
 });
 $('#shade').addEventListener('click', e => { if (e.target === $('#shade')) $('#shade').classList.remove('open'); });
 function applyTheme(){
-  document.documentElement.dataset.theme = settings.theme;
-  bridge.send('set-theme', { dark: settings.theme === 'dark' });
+  const r = document.documentElement;
+  const mode = settings.mode || 'dark';
+  const light = mode === 'light';
+  r.dataset.theme = light ? 'light' : 'dark';
+  r.dataset.appearance = mode;                 // 'dark' | 'light' | 'glass'
+  r.dataset.density = settings.density || 'cozy';
+  r.style.setProperty('--accent', settings.accent || '#1d9bf0');
+  /* wallpaper: an explicit preset, or a default for glass so there's always
+     something for the frost to refract */
+  let wall = settings.wallpaper && WALLS[settings.wallpaper] !== undefined ? WALLS[settings.wallpaper]
+           : (settings.wallpaper && /url\(|gradient|#|http/.test(settings.wallpaper) ? settings.wallpaper : '');
+  if (!wall && mode === 'glass') wall = WALLS.aurora;
+  r.style.setProperty('--wall', wall || 'none');
+  r.dataset.wallOn = wall ? '1' : '0';
+  settings.theme = light ? 'light' : 'dark';   // keep the legacy flag in step
+  bridge.send('set-theme', { dark: !light });
+  bridge.send('set-material', { glass: mode === 'glass' });
 }
 
 /* ---------------------- permission prompts ---------------------- */
@@ -1311,6 +1496,7 @@ function chord(c){
     case 'escape':
       if ($('#findbar').classList.contains('open')) closeFind();
       else if ($('#menu').classList.contains('open')) $('#menu').classList.remove('open');
+      else if ($('#acctShade').classList.contains('open')) closeAccount();
       else if ($('#shade').classList.contains('open')) $('#shade').classList.remove('open');
       else document.querySelectorAll('.panel.open').forEach(p => p.classList.remove('open'));
       break;
@@ -1387,6 +1573,200 @@ function persistSession(){
   }, 250);
 }
 
+/* ================================================================
+   ACCOUNTS + SYNC — the browser's own KONEKT account. Stores your
+   bookmarks, history, speed-dials, settings and appearance on the
+   server so a second device signs in and sees the same thing. The
+   backend is the konekt-browser Vercel deployment (same design and
+   Redis as konekt-tawny); auth is a bearer token kept locally.
+   ================================================================ */
+const API_BASE = 'https://konekt-browser.vercel.app';
+let account = load('kb.account', null);      // { handle, name, token }
+let syncVer = load('kb.syncver', 0);
+let authTab = 'login';
+
+async function kbApi(path, opts){
+  opts = opts || {};
+  const headers = Object.assign({ 'Content-Type': 'application/json' }, opts.headers || {});
+  if (account && account.token) headers['Authorization'] = 'Bearer ' + account.token;
+  const r = await fetch(API_BASE + path, {
+    method: opts.method || 'GET', headers,
+    body: opts.body ? JSON.stringify(opts.body) : undefined
+  });
+  let j = {};
+  try { j = await r.json(); } catch {}
+  if (!r.ok || j.ok === false) throw new Error(j.error || ('HTTP ' + r.status));
+  return j;
+}
+
+/* ---- the blob we sync ---- */
+function collectData(){
+  return {
+    bookmarks: bookmarks,
+    history: history.slice(-1200),
+    dials: dials,
+    settings: { engine: settings.engine, restore: settings.restore, adblock: settings.adblock, homepage: settings.homepage },
+    appearance: { mode: settings.mode, accent: settings.accent, wallpaper: settings.wallpaper, density: settings.density }
+  };
+}
+function mergeIn(d){
+  if (!d || typeof d !== 'object') return;
+  if (Array.isArray(d.bookmarks)){
+    const seen = new Set(bookmarks.map(b => b.u));
+    d.bookmarks.forEach(b => { if (b && b.u && !seen.has(b.u)){ bookmarks.push(b); seen.add(b.u); } });
+    save('kb.bookmarks', bookmarks);
+  }
+  if (Array.isArray(d.dials)){
+    const seen = new Set(dials.map(x => x.u));
+    d.dials.forEach(x => { if (x && x.u && !seen.has(x.u)){ dials.push(x); seen.add(x.u); } });
+    save('kb.dials', dials);
+  }
+  if (Array.isArray(d.history)){
+    const map = new Map();
+    history.concat(d.history).forEach(h => { if (h && h.u){ const p = map.get(h.u); if (!p || (h.ts||0) > (p.ts||0)) map.set(h.u, h); } });
+    history = [...map.values()].sort((a,b) => (a.ts||0) - (b.ts||0)).slice(-1500);
+    save('kb.history', history);
+  }
+  if (d.settings && typeof d.settings === 'object'){
+    ['engine','restore','adblock','homepage'].forEach(k => { if (d.settings[k] !== undefined) settings[k] = d.settings[k]; });
+  }
+  if (d.appearance && typeof d.appearance === 'object'){
+    ['mode','accent','wallpaper','density'].forEach(k => { if (d.appearance[k] !== undefined) settings[k] = d.appearance[k]; });
+  }
+  saveSettings();
+}
+
+let pulling = false;
+async function pullSync(){
+  if (!account) return;
+  pulling = true;
+  try {
+    const j = await kbApi('/api/sync');
+    mergeIn(j.data);
+    syncVer = j.ver || 0; save('kb.syncver', syncVer);
+    applyTheme(); renderStart(); renderOmni(); renderBm();
+    bridge.send('adblock-set', { on: settings.adblock !== false });
+    setSyncLine('Synced');
+  } catch (e) { setSyncLine('Sync failed — ' + e.message); }
+  finally { pulling = false; }
+}
+let pushT = null, pushing = false;
+function schedulePush(){
+  if (!account || pulling) return;
+  clearTimeout(pushT);
+  pushT = setTimeout(doPush, 1200);
+}
+async function doPush(){
+  if (!account || pushing) return;
+  pushing = true;
+  try {
+    const j = await kbApi('/api/sync', { method: 'PUT', body: { data: collectData() } });
+    syncVer = j.ver || syncVer; save('kb.syncver', syncVer);
+    setSyncLine('Synced');
+  } catch (e) { setSyncLine('Sync failed — ' + e.message); }
+  finally { pushing = false; }
+}
+/* every save() of a synced key schedules a push */
+window.kbOnSave = k => { if (account && /^kb\.(bookmarks|history|dials|settings)$/.test(k)) schedulePush(); };
+
+function setSyncLine(t){ const el = $('#syncLine'); if (el) el.textContent = t + ' · v' + syncVer; }
+
+/* ---- in-app updates: compare this build to the latest GitHub release ---- */
+const REPO = 'vapesnuseu-cmyk/konekt-browser';
+const RELEASES_URL = 'https://github.com/' + REPO + '/releases/latest';
+function verNums(v){ return String(v || '').replace(/^v/, '').split('.').map(n => parseInt(n, 10) || 0); }
+function newer(a, b){ const A = verNums(a), B = verNums(b); for (let i = 0; i < 3; i++){ if ((A[i]||0) > (B[i]||0)) return true; if ((A[i]||0) < (B[i]||0)) return false; } return false; }
+async function checkUpdates(){
+  const line = $('#updLine'); if (line){ line.className = 'set-note'; line.textContent = 'Checking…'; }
+  let cur = '0.0.0';
+  try { cur = (await bridge.info()).version || '0.0.0'; } catch {}
+  try {
+    const r = await fetch('https://api.github.com/repos/' + REPO + '/releases/latest', { headers: { Accept: 'application/vnd.github+json' } });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const j = await r.json();
+    const latest = j.tag_name || j.name || '';
+    if (!line) return;
+    if (newer(latest, cur)){
+      line.className = 'set-note';
+      line.innerHTML = 'Update available: <b>' + esc(latest) + '</b> (you have ' + esc(cur) + '). '
+        + '<a href="#" id="updGet" style="color:var(--accent)">Get it</a>';
+      const g = $('#updGet'); if (g) g.onclick = ev => { ev.preventDefault(); newTab(RELEASES_URL); $('#shade').classList.remove('open'); };
+    } else {
+      line.className = 'set-note'; line.textContent = 'You’re on the latest version (' + esc(cur) + ').';
+    }
+  } catch (e) {
+    if (line){ line.className = 'set-note'; line.innerHTML = 'Couldn’t check (' + esc(e.message) + '). <a href="#" id="updOpen" style="color:var(--accent)">Open releases</a>'; const o = $('#updOpen'); if (o) o.onclick = ev => { ev.preventDefault(); newTab(RELEASES_URL); }; }
+  }
+}
+
+/* ---- account button + modal ---- */
+function acctInitial(){ return account ? (account.name || account.handle || '?').trim().charAt(0).toUpperCase() : ''; }
+function renderAcctButton(){
+  const b = $('#sAcct');
+  b.classList.toggle('signed', !!account);
+  b.innerHTML = account
+    ? '<span class="acc-ini">' + esc(acctInitial()) + '</span><span class="acc-dot"></span>'
+    : ic('user', 17);
+  b.title = account ? ('@' + account.handle) : 'Account';
+}
+function openAccount(){ $('#acctShade').classList.add('open'); renderAccount(); }
+function closeAccount(){ $('#acctShade').classList.remove('open'); }
+function renderAccount(){
+  $('#acctLogo').innerHTML = logoLong(22);
+  if (account){
+    $('#acctBody').innerHTML =
+      '<div class="acc-tag">Account</div>'
+      + '<div class="acc-me"><div class="who"><div class="av">' + esc(acctInitial()) + '</div>'
+        + '<div><div class="nm">' + esc(account.name || account.handle) + '</div>'
+        + '<div class="hd">@' + esc(account.handle) + '</div></div></div>'
+      + '<div class="syncline" id="syncLine">Synced · v' + syncVer + '</div>'
+      + '<div class="acc-row"><button id="acctSync">Sync now</button>'
+        + '<button class="danger" id="acctOut">Sign out</button></div></div>';
+    $('#acctSync').onclick = async () => { setSyncLine('Syncing…'); await doPush(); await pullSync(); };
+    $('#acctOut').onclick = () => {
+      account = null; save('kb.account', null);
+      renderAcctButton(); renderAccount(); toast('Signed out');
+    };
+    return;
+  }
+  const sub = t => '<button class="auth-sub'+(authTab===t?' on':'')+'" data-authtab="'+t+'">'+(t==='login'?'Sign in':'Create account')+'</button>';
+  const create = authTab === 'create';
+  $('#acctBody').innerHTML =
+    '<div class="acc-tag">Your KONEKT Browser account</div>'
+    + '<div class="auth-tabs">' + sub('login') + sub('create') + '</div>'
+    + '<div class="auth-form">'
+      + '<input id="auHandle" placeholder="Handle" autocomplete="off" spellcheck="false" maxlength="20">'
+      + (create ? '<input id="auName" placeholder="Display name (optional)" autocomplete="off" maxlength="40">' : '')
+      + '<input id="auPass" type="password" placeholder="Password" maxlength="80">'
+      + '<div class="auth-msg" id="auMsg">' + (create ? 'Handles are 3–20 chars: a–z, 0–9, underscore.' : '') + '</div>'
+      + '<button class="auth-go" id="auGo">' + (create ? 'Create account' : 'Sign in') + '</button>'
+    + '</div>';
+  $$('[data-authtab]').forEach(el => el.onclick = () => { authTab = el.dataset.authtab; renderAccount(); });
+  const go = $('#auGo'), msg = $('#auMsg');
+  const submit = async () => {
+    const handle = ($('#auHandle').value || '').trim().toLowerCase().replace(/^@/, '');
+    const password = $('#auPass').value || '';
+    const name = create && $('#auName') ? ($('#auName').value || '').trim() : '';
+    if (!handle || !password){ msg.className = 'auth-msg err'; msg.textContent = 'Handle and password required'; return; }
+    go.disabled = true; msg.className = 'auth-msg'; msg.textContent = create ? 'Creating…' : 'Signing in…';
+    try {
+      const j = await kbApi('/api/auth', { method: 'POST', body: { action: create ? 'register' : 'login', handle, password, name } });
+      account = { handle: j.user.handle, name: j.user.name, token: j.token };
+      save('kb.account', account);
+      msg.className = 'auth-msg ok'; msg.textContent = 'Welcome, @' + account.handle;
+      renderAcctButton();
+      await pullSync();          // merge server → local
+      await doPush();            // and push the merged set back
+      renderAccount();
+      toast('Signed in as @' + account.handle);
+    } catch (e) {
+      go.disabled = false; msg.className = 'auth-msg err'; msg.textContent = e.message;
+    }
+  };
+  go.onclick = submit;
+  $('#auPass').addEventListener('keydown', e => { if (e.key === 'Enter') submit(); });
+}
+
 /* ---------------------- boot ---------------------- */
 $('#capLogo').innerHTML = logoShort(19);
 $('#ntb').innerHTML = ic('plus',14);
@@ -1412,6 +1792,11 @@ $('#sHist').onclick = () => togglePanel('pHist');
 $('#sDlB').onclick = () => togglePanel('pDl');
 $('#sShield').onclick = () => openSettings();
 $('#sSet').onclick = () => openSettings();
+$('#sAcct').onclick = () => openAccount();
+$('#acctX').innerHTML = ic('x', 13);
+$('#acctX').onclick = () => closeAccount();
+$('#acctShade').addEventListener('click', e => { if (e.target === $('#acctShade')) closeAccount(); });
+renderAcctButton();
 $('#kpOpen').onclick = () => {
   let u = 'https://konekt-tawny.vercel.app';
   try { if (kpanelToggle._wv) u = kpanelToggle._wv.getURL() || u; } catch {}
@@ -1432,11 +1817,16 @@ if (settings.restore && sess && Array.isArray(sess.urls) && sess.urls.length){
   newTab(START);
 }
 bridge.send('chrome-ready');
+if (account) pullSync();   // refresh from the server on launch
 
 /* ---------------------- smoke hooks ---------------------- */
 window.KB = {
   newTab,
   adblockState(){ return { on: settings.adblock !== false, blocked: adCount }; },
+  smokeGlass(){ settings.mode = 'glass'; settings.accent = '#a970ff'; applyTheme(); navigate(AT(), START); },
+  smokeAccount(){ openAccount(); },
+  smokeSettings(){ openSettings(); },
+  appearanceState(){ return { mode: settings.mode, accent: settings.accent, wallpaper: settings.wallpaper, density: settings.density, hasAccount: !!account }; },
   smokeNav(url){ navigate(AT(), url); },
   smokeState(){
     const t = AT();

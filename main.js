@@ -255,6 +255,15 @@ ipcMain.on('set-theme', (_e, { dark }) => {
       : { color: '#ffffff', symbolColor: '#000000', height: 38 });
   } catch {}
 });
+/* Liquid Glass — Windows 11 acrylic behind the (translucent) chrome.
+   No-op / harmless on older Windows and other platforms. */
+ipcMain.on('set-material', (_e, { glass }) => {
+  if (!win) return;
+  try {
+    win.setBackgroundColor(glass ? '#00000000' : '#000000');
+    if (typeof win.setBackgroundMaterial === 'function') win.setBackgroundMaterial(glass ? 'acrylic' : 'none');
+  } catch {}
+});
 ipcMain.on('clear-data', async () => {
   const s = session.fromPartition(PARTITION);
   await s.clearStorageData();
@@ -367,12 +376,35 @@ async function runSmoke() {
     fs.writeFileSync(path.join(smokeDir, 'smoke-opera.png'),
       (await win.webContents.capturePage()).toPNG());
     out.adblock = await win.webContents.executeJavaScript('KB.adblockState()');
-    await win.webContents.executeJavaScript('kpanelToggle(false), undefined');
+
+    /* Liquid Glass appearance on the Speed Dial, with the KONEKT panel open */
+    await win.webContents.executeJavaScript('KB.smokeGlass(), undefined');
+    await delay(1500);
+    fs.writeFileSync(path.join(smokeDir, 'smoke-glass.png'),
+      (await win.webContents.capturePage()).toPNG());
+    out.appearance = await win.webContents.executeJavaScript('KB.appearanceState()');
+
+    /* account modal (sign in / create) */
+    await win.webContents.executeJavaScript('kpanelToggle(false), KB.smokeAccount(), undefined');
+    await delay(700);
+    fs.writeFileSync(path.join(smokeDir, 'smoke-account.png'),
+      (await win.webContents.capturePage()).toPNG());
+    /* back to an opaque window before the guest capture — capturePage can
+       stall on a transparent/acrylic window */
+    await win.webContents.executeJavaScript('settings.mode="dark",applyTheme(),closeAccount(),undefined');
+    await delay(600);
+
     const guest = require('electron').webContents.getAllWebContents()
       .find(c => c.getType() === 'webview');
     if (guest) {
-      fs.writeFileSync(path.join(smokeDir, 'smoke-guest.png'), (await guest.capturePage()).toPNG());
       out.guestTitle = guest.getTitle();
+      try {
+        const img = await Promise.race([
+          guest.capturePage(),
+          new Promise((_r, rej) => setTimeout(() => rej(new Error('capture-timeout')), 5000))
+        ]);
+        fs.writeFileSync(path.join(smokeDir, 'smoke-guest.png'), img.toPNG());
+      } catch { out.guestCapture = 'skipped'; }
     }
     out.ok = true;
   } catch (err) {
