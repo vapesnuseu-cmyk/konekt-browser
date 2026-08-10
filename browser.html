@@ -373,6 +373,32 @@ body.bmbar-on #bmbar{display:flex}
 .ctx-row.dis{opacity:.38;pointer-events:none}
 .ctx-sep{height:1px;background:var(--line-3);margin:5px 0}
 
+/* ---------------- reader mode ---------------- */
+.reader-ov{position:absolute;inset:0;z-index:70;background:var(--bg);display:flex;flex-direction:column;overflow:hidden}
+.reader-bar{flex:0 0 auto;display:flex;align-items:center;gap:8px;padding:9px 14px;border-bottom:1px solid var(--line-3)}
+.reader-bar .sp{flex:1}
+.reader-x{width:28px;height:28px;display:flex;align-items:center;justify-content:center;color:var(--dim)}
+.reader-x:hover{color:var(--text);background:var(--hover-2)}
+.reader-src{font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.1em;font-weight:600}
+.reader-fz,.reader-orig{font-size:11px;font-weight:700;color:var(--dim);padding:5px 11px;border:1px solid var(--line-3)}
+.reader-fz:hover,.reader-orig:hover{color:var(--text);border-color:var(--line-2)}
+.reader-doc{flex:1 1 auto;overflow-y:auto;padding:6vh 24px 12vh;max-width:720px;margin:0 auto;width:100%;line-height:1.75}
+.reader-title{font-size:2em;font-weight:800;line-height:1.2;margin-bottom:12px}
+.reader-by{font-size:.8em;color:var(--dim);font-weight:600;margin-bottom:4px}
+.reader-meta{font-size:.7em;color:var(--dim-2);text-transform:uppercase;letter-spacing:.1em;margin-bottom:26px;padding-bottom:20px;border-bottom:1px solid var(--line-3)}
+.reader-body p{margin:0 0 1.1em}
+.reader-body h1,.reader-body h2,.reader-body h3,.reader-body h4{font-weight:800;margin:1.4em 0 .5em;line-height:1.25}
+.reader-body h2{font-size:1.4em}.reader-body h3{font-size:1.15em}
+.reader-body a{color:var(--accent);text-decoration:underline;text-underline-offset:2px;cursor:pointer}
+.reader-body img{max-width:100%;height:auto;margin:1.2em auto;display:block}
+.reader-body ul,.reader-body ol{margin:0 0 1.1em;padding-left:1.4em}
+.reader-body li{margin:.3em 0}
+.reader-body blockquote{margin:1.2em 0;padding-left:1em;border-left:3px solid var(--line);color:var(--dim)}
+.reader-body pre{background:var(--hover);padding:14px;overflow-x:auto;font-size:.85em;margin:1.2em 0}
+.reader-body code{font-family:Consolas,monospace;font-size:.9em}
+.reader-body table{width:100%;border-collapse:collapse;margin:1.2em 0;font-size:.9em;display:block;overflow-x:auto}
+.reader-body td,.reader-body th{border:1px solid var(--line-3);padding:6px 10px;text-align:left}
+
 /* ---------------- error overlay ---------------- */
 #errov{position:absolute;inset:0;display:none;align-items:center;justify-content:center;background:var(--bg);z-index:5}
 #errov.on{display:flex}
@@ -1859,6 +1885,7 @@ function toggleMenu(){
     + '<div class="m-sep"></div>'
     + mrow('book','Add to reading list','','readlater')
     + mrow('file','Capture screenshot','','shot')
+    + mrow('book','Reader mode','','reader')
     + mrow('globe','Translate page','','translate')
     + mrow('out','Copy link','','copy')
     + '<div class="m-sep"></div>'
@@ -1889,6 +1916,7 @@ $('#menu').addEventListener('click', e => {
   else if (act === 'print'){ if (t && t.wv && t.ready) try { t.wv.print(); } catch {} }
   else if (act === 'readlater') addReadingList();
   else if (act === 'shot') screenshotPage();
+  else if (act === 'reader') openReader();
   else if (act === 'translate') translatePage();
   else if (act === 'copy') copyLink();
   else if (act === 'bm') togglePanel('pBm');
@@ -1918,6 +1946,62 @@ function translatePage(){
   newTab('https://translate.google.com/translate?sl=auto&tl=en&u=' + encodeURIComponent(t.url));
 }
 function copyLink(){ const t = AT(); if (!t || t.url === START) return; bridge.send('clip-write', t.url); toast('Link copied'); }
+/* ---- reader mode: extract the article, sanitize, render a clean view ---- */
+const READER_EXTRACT = "(function(){"
+  + "function sc(el){var s=0;el.querySelectorAll('p,li,blockquote').forEach(function(p){var t=(p.innerText||'').trim();if(t.length>25)s+=t.length;});return s;}"
+  + "var best=document.body,bs=0;"
+  + "document.querySelectorAll('article,main,[role=main],.post,.article,.entry,.entry-content,.article-body,.article__body,.story-body,.postArticle,.content,#content,.markdown-body,.mw-parser-output').forEach(function(el){var s=sc(el);if(s>bs){bs=s;best=el;}});"
+  + "if(bs<200){document.querySelectorAll('section,div').forEach(function(el){var s=sc(el);if(s>bs){bs=s;best=el;}});}"
+  + "var mt=document.querySelector('meta[property=\"og:title\"]');"
+  + "var title=(mt&&mt.content)||(document.querySelector('h1')&&document.querySelector('h1').innerText)||document.title||'';"
+  + "var au=document.querySelector('meta[name=author]');var abody=document.querySelector('[rel=author],.author,.byline,.byline__name');"
+  + "var byline=(au&&au.content)||(abody&&abody.innerText)||'';"
+  + "var clone=best.cloneNode(true);"
+  + "clone.querySelectorAll('script,style,noscript,nav,aside,form,button,iframe,svg,header,footer,[aria-hidden=true],[role=navigation],[class*=share],[class*=social],[class*=related],[class*=recirc],[class*=promo],[class*=newsletter],[class*=comment],[class*=advert],[id*=comment],figcaption').forEach(function(n){n.remove();});"
+  + "return {title:title,byline:byline,html:clone.innerHTML,url:location.href,chars:(clone.innerText||'').trim().length};"
+  + "})()";
+function openReader(){
+  const t = AT();
+  if (!t || !t.wv || !t.ready || !/^https?:/.test(t.url||'')){ toast('Nothing to read here'); return; }
+  t.wv.executeJavaScript(READER_EXTRACT, false).then(res => {
+    if (!res || (res.chars||0) < 200){ toast('No readable article found'); return; }
+    renderReader(res);
+  }).catch(() => toast('Reader failed'));
+}
+function sanitizeReader(html, baseUrl){
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  doc.querySelectorAll('script,style,link,meta,iframe,object,embed,form,input,button,svg,video,audio').forEach(n => n.remove());
+  const allow = new Set(['P','H1','H2','H3','H4','H5','H6','UL','OL','LI','BLOCKQUOTE','PRE','CODE','EM','STRONG','B','I','U','A','IMG','FIGURE','FIGCAPTION','BR','HR','SPAN','DIV','TABLE','THEAD','TBODY','TR','TD','TH','MARK','SUP','SUB']);
+  doc.body.querySelectorAll('*').forEach(el => {
+    if (!allow.has(el.tagName)){ el.replaceWith(...el.childNodes); return; }
+    [...el.attributes].forEach(a => { const n = a.name.toLowerCase();
+      if (n === 'href' || n === 'src'){ try { const abs = new URL(a.value, baseUrl).href; if (/^javascript:/i.test(abs)) el.removeAttribute(a.name); else el.setAttribute(a.name, abs); } catch { el.removeAttribute(a.name); } }
+      else if (n !== 'alt' && n !== 'title') el.removeAttribute(a.name);
+    });
+    if (el.tagName === 'A') el.setAttribute('data-rlink', '1');
+  });
+  return doc.body.innerHTML;
+}
+let readerFs = load('kb.readerfs', 18);
+function renderReader(res){
+  closeReader();
+  const clean = sanitizeReader(res.html, res.url), host = hostOf(res.url);
+  const ov = document.createElement('div'); ov.id = 'reader'; ov.className = 'reader-ov';
+  ov.innerHTML = '<div class="reader-bar"><button class="reader-x" id="rdX"></button>'
+    + '<span class="reader-src">'+esc(host)+'</span><span class="sp"></span>'
+    + '<button class="reader-fz" data-rfz="-1">A−</button><button class="reader-fz" data-rfz="1">A+</button>'
+    + '<button class="reader-orig" id="rdOrig">Original</button></div>'
+    + '<div class="reader-doc" id="rdDoc" style="font-size:'+readerFs+'px">'
+    + '<h1 class="reader-title">'+esc(res.title||host)+'</h1>'
+    + (res.byline ? '<div class="reader-by">'+esc(res.byline)+'</div>' : '')
+    + '<div class="reader-meta">'+esc(host)+' · '+Math.max(1, Math.round((res.chars||0)/1100))+' min read</div>'
+    + '<div class="reader-body">'+clean+'</div></div>';
+  $('#main').appendChild(ov);
+  $('#rdX').innerHTML = ic('x', 15); $('#rdX').onclick = closeReader; $('#rdOrig').onclick = closeReader;
+  ov.querySelectorAll('[data-rfz]').forEach(b => b.onclick = () => { readerFs = Math.max(13, Math.min(28, readerFs + (+b.dataset.rfz) * 1.5)); save('kb.readerfs', readerFs); $('#rdDoc').style.fontSize = readerFs + 'px'; });
+  ov.addEventListener('click', e => { const a = e.target.closest('a[data-rlink]'); if (a && a.getAttribute('href')){ e.preventDefault(); closeReader(); navigate(AT(), a.getAttribute('href')); } });
+}
+function closeReader(){ const r = $('#reader'); if (r) r.remove(); }
 function openReadingList(){
   const ov = document.createElement('div'); ov.className = 'shade-dyn open';
   const items = readingList.length
@@ -1938,7 +2022,7 @@ function buildDrawer(){
   D.innerHTML = '<div class="dw-head">'+logoLong(20)+'<span class="sp"></span><button class="p-x" id="dwX"></button></div>'
     + '<div class="dw-sec">Browse</div>' + row('plus','New tab','newtab','Ctrl+T') + row('home','Speed Dial','home') + row('globe','KONEKT panel','kpanel')
     + '<div class="dw-sec">Library</div>' + row('star','Bookmarks','bm') + row('hist','History','hist','Ctrl+H') + row('dl','Downloads','dl','Ctrl+J') + row('book','Reading list','reading')
-    + '<div class="dw-sec">This page</div>' + row('book','Add to reading list','readlater') + row('file','Screenshot','shot') + row('globe','Translate','translate') + row('out','Copy link','copy')
+    + '<div class="dw-sec">This page</div>' + row('book','Reader mode','reader') + row('book','Add to reading list','readlater') + row('file','Screenshot','shot') + row('globe','Translate','translate') + row('out','Copy link','copy')
     + '<div class="dw-pad"></div>'
     + '<div class="dw-sec">KONEKT</div>' + row('gear','Settings','set') + row('user','Account','account')
     + '<div class="dw-foot">© 2026 KONEKT · NKO Intl. Foundation</div>';
@@ -1955,6 +2039,7 @@ $('#drawer').addEventListener('click', e => {
   else if (act==='hist') togglePanel('pHist');
   else if (act==='dl') togglePanel('pDl');
   else if (act==='reading') openReadingList();
+  else if (act==='reader') openReader();
   else if (act==='readlater') addReadingList();
   else if (act==='shot') screenshotPage();
   else if (act==='translate') translatePage();
@@ -2358,7 +2443,8 @@ function chord(c){
     case 'alt+left': if (t && t.wv) try { t.wv.goBack(); } catch {} break;
     case 'alt+right': if (t && t.wv) try { t.wv.goForward(); } catch {} break;
     case 'escape':
-      if ($('#cmdk')) $('#cmdk').remove();
+      if ($('#reader')) closeReader();
+      else if ($('#cmdk')) $('#cmdk').remove();
       else if ($('#findbar').classList.contains('open')) closeFind();
       else if ($('#drawer').classList.contains('open')) closeDrawer();
       else if ($('#menu').classList.contains('open')) $('#menu').classList.remove('open');

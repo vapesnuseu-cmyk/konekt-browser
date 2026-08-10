@@ -37,8 +37,8 @@ await rcedit(exe, {
     OriginalFilename: 'KONEKT Browser.exe',
     InternalName: 'konekt-browser'
   },
-  'file-version': '1.4.0.0',
-  'product-version': '1.4.0.0',
+  'file-version': '1.5.0.0',
+  'product-version': '1.5.0.0',
   icon: path.join(root, 'dist', 'icon.ico')
 });
 

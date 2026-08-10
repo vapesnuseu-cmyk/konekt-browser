@@ -476,6 +476,19 @@ async function runSmoke() {
       (await win.webContents.capturePage()).toPNG());
     await win.webContents.executeJavaScript('($("#cmdk")&&$("#cmdk").remove()), undefined');
 
+    /* reader mode on a real article */
+    await win.webContents.executeJavaScript('KB.smokeNav("https://en.wikipedia.org/wiki/Web_browser"), undefined');
+    for (let i = 0; i < 60; i++){ await delay(250);
+      const s = await win.webContents.executeJavaScript('KB.smokeState()');
+      if (s && !s.loading && /wiki\/Web_browser/.test(s.url||'')) break; }
+    await delay(500);
+    await win.webContents.executeJavaScript('openReader(), undefined');
+    await delay(1800);
+    fs.writeFileSync(path.join(smokeDir, 'smoke-reader.png'),
+      (await win.webContents.capturePage()).toPNG());
+    out.reader = await win.webContents.executeJavaScript('(function(){var d=document.querySelector(".reader-body");return d?d.innerText.trim().length:0;})()');
+    await win.webContents.executeJavaScript('closeReader(),KB.smokeNav("konekt://start"),undefined');
+
     /* account modal (sign in / create) */
     await win.webContents.executeJavaScript('kpanelToggle(false), KB.smokeAccount(), undefined');
     await delay(700);

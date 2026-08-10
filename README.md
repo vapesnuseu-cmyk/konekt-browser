@@ -72,6 +72,16 @@ The browser now mirrors KONEKT's own appearance settings:
   (Default / Glass / Solid / Clear / Accent). Layout, styles and scale sync.
 - Fixed a 1.3.0 regression where the slide-out drawer hid the left icon rail.
 
+### New in 1.5
+
+- **Reader mode** — one click (menu, drawer, or the *Reader mode* command)
+  lifts the article out of any page and lays it out clean in KONEKT type on a
+  distraction-free view: title, byline, estimated read time, adjustable text
+  size (A− / A+, remembered), and *Original* to jump back. Extraction scores the
+  page's blocks and keeps the story's links and images; scripts, iframes, forms,
+  ads and sidebars are stripped, and the HTML is sanitised before it renders in
+  the trusted chrome.
+
 ## Run it
 
 Double-click **`KONEKT Browser.cmd`** — or from a terminal:
