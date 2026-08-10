@@ -503,6 +503,18 @@ async function runSmoke() {
     /* reset to a single Main workspace + start page */
     await win.webContents.executeJavaScript('closeWsPop(); settings.workspaces=[{id:"main",name:"Main",color:"#a970ff"}]; wsSetActive("main"); tabs.forEach(t=>t.ws="main"); KB.smokeNav("konekt://start"); renderTabs(); undefined');
 
+    /* split view — two real pages side by side */
+    await win.webContents.executeJavaScript('KB.smokeSplit(), undefined');
+    for (let i = 0; i < 40; i++){ await delay(250);
+      const s = await win.webContents.executeJavaScript('KB.smokeState()');
+      if (s && !s.loading && /example\.com/.test(s.url||'')) break; }
+    await delay(1600);
+    out.split = await win.webContents.executeJavaScript('KB.smokeSplitGo()');
+    await delay(700);
+    fs.writeFileSync(path.join(smokeDir, 'smoke-split.png'),
+      (await win.webContents.capturePage()).toPNG());
+    await win.webContents.executeJavaScript('splitId=null; renderStageVis(); KB.smokeNav("konekt://start"); undefined');
+
     /* account modal (sign in / create) */
     await win.webContents.executeJavaScript('kpanelToggle(false), KB.smokeAccount(), undefined');
     await delay(700);

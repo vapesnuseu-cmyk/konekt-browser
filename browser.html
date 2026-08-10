@@ -233,6 +233,20 @@ body.fs #cap,body.fs #bar,body.fs #side,body.fs #prog{display:none}
 webview.wv{position:absolute;inset:0;visibility:hidden;background:#fff}
 webview.wv.on{visibility:visible}
 webview.wv.htmlfs{position:fixed;inset:0;z-index:120;visibility:visible}
+/* split view — active tab left, partner right, draggable divider */
+#stage.split webview.wv.on{right:calc(100% - var(--split,50%))}
+#stage.split webview.wv.on-r{left:var(--split,50%);visibility:visible}
+#stage.split #start.on{right:calc(100% - var(--split,50%))}
+#splitDiv{display:none;position:absolute;top:0;bottom:0;left:var(--split,50%);transform:translateX(-50%);
+  width:16px;z-index:60;flex-direction:column;align-items:center;cursor:col-resize}
+#splitDiv .split-grip{flex:1 1 auto;width:2px;background:var(--line-2)}
+#splitDiv:hover .split-grip,#splitDiv.drag .split-grip{width:3px;background:var(--accent)}
+#splitDiv .split-ctl{display:flex;gap:1px;margin-top:9px;background:var(--bg);border:1px solid var(--line);
+  border-radius:var(--radius);overflow:hidden;opacity:0;transition:opacity .12s;box-shadow:0 3px 12px rgba(0,0,0,.4)}
+#splitDiv:hover .split-ctl,#splitDiv.drag .split-ctl{opacity:1}
+#splitDiv .split-ctl button{width:23px;height:22px;display:flex;align-items:center;justify-content:center;
+  color:var(--dim);font-size:12px;-webkit-app-region:no-drag}
+#splitDiv .split-ctl button:hover{background:var(--hover-2);color:var(--text)}
 
 /* ---------------- start page ---------------- */
 #start{position:absolute;inset:0;display:none;overflow-y:auto}
@@ -773,6 +787,7 @@ body{background-color:var(--bg);background-image:var(--wall,none);background-siz
 <div id="stage">
   <div id="start"></div>
   <div id="errov"></div>
+  <div id="splitDiv"><div class="split-ctl"><button id="splitSwap" title="Swap sides"></button><button id="splitX" title="Close split view (Ctrl+\)">✕</button></div><div class="split-grip"></div></div>
 
   <div class="panel" id="pHist">
     <div class="p-head"><h3>History</h3><button class="p-act" id="histClear">Clear</button><button class="p-x" data-close="pHist"></button></div>
@@ -867,7 +882,9 @@ function ic(name, size){
     shield:'M12 3l7 2.6v5.1c0 4.6-2.9 8.5-7 10.3-4.1-1.8-7-5.7-7-10.3V5.6z',
     out:'M13 5h6v6M19 5l-9 9M9 6H5v13h13v-4',
     pip:'M3 6h18v12H3zM12 12h7v5h-7z',
-    book:'M5 4h6a2 2 0 0 1 2 2v14a2 2 0 0 0-2-2H5zM19 4h-6a2 2 0 0 0-2 2v14a2 2 0 0 1 2-2h6z'
+    book:'M5 4h6a2 2 0 0 1 2 2v14a2 2 0 0 0-2-2H5zM19 4h-6a2 2 0 0 0-2 2v14a2 2 0 0 1 2-2h6z',
+    split:'M4 5h16v14H4zM12 5v14',
+    swap:'M7 4 3 8l4 4M3 8h13M17 20l4-4-4-4M21 16H8'
   }[name];
   return '<svg viewBox="0 0 24 24" width="'+size+'" height="'+size+'" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="'+P+'"/></svg>';
 }
@@ -1146,11 +1163,29 @@ function navigate(t, input){
   renderAll();
 }
 
+let splitId = null;   // right-pane tab id in split view (null = no split)
+
+function renderStageVis(){
+  let sp = splitId != null ? T(splitId) : null;
+  if (sp && sp.id === activeId) sp = null;         // can't split a tab with itself
+  const split = !!sp;
+  splitId = split ? sp.id : null;
+  if (split && sp.url && sp.url !== START && !sp.wv) attach(sp, sp.url);
+  const rid = split ? sp.id : -1;
+  $('#stage').classList.toggle('split', split);
+  tabs.forEach(t => { if (t.wv){ t.wv.classList.toggle('on', t.id === activeId); t.wv.classList.toggle('on-r', t.id === rid); } });
+  const dv = $('#splitDiv'); if (dv) dv.style.display = split ? 'flex' : 'none';
+}
+
 function activate(id){
   const t0 = T(id);
+  // clicking the partner pane's tab swaps the two sides
+  if (splitId != null && id === splitId && T(activeId)) splitId = activeId;
   if (t0 && (t0.ws || 'main') !== wsActiveId()) wsSetActive(t0.ws || 'main');
+  // the partner must exist, differ from the new active tab, and share its workspace
+  if (splitId != null){ const p = T(splitId); if (!p || p.id === id || (p.ws || 'main') !== (t0 ? (t0.ws || 'main') : 'main')) splitId = null; }
   activeId = id;
-  tabs.forEach(t => { if (t.wv) t.wv.classList.toggle('on', t.id === id); });
+  renderStageVis();
   renderAll();
   const t = AT();
   if (t && t.wv && t.ready) t.wv.focus();
@@ -1158,20 +1193,40 @@ function activate(id){
   persistSession();
 }
 
+function setSplit(partnerId){
+  const a = AT(), p = T(partnerId);
+  if (!a || !p || p.id === activeId){ toast('Open another tab to split the view'); return; }
+  if ((p.ws || 'main') !== (a.ws || 'main')){ toast('That tab is in another workspace'); return; }
+  if (!p.url || p.url === START){ toast('That tab has no page to show'); return; }
+  splitId = partnerId; renderStageVis(); renderAll();
+}
+function toggleSplit(){
+  if (splitId != null){ splitId = null; renderStageVis(); renderAll(); return; }
+  const list = wsTabs();
+  if (list.length < 2){ toast('Open another tab to split the view'); return; }
+  const idx = list.findIndex(t => t.id === activeId);
+  let partner = list[idx + 1] || list[idx - 1];
+  if (partner && partner.url === START){ const real = list.find(t => t.id !== activeId && t.wv); if (real) partner = real; }
+  if (partner) setSplit(partner.id);
+}
+function splitSwap(){ if (splitId == null) return; const s = splitId; splitId = activeId; activeId = s; renderStageVis(); renderAll(); }
+
 function closeTab(id){
   const i = tabs.findIndex(t => t.id === id);
   if (i < 0) return;
   const t = tabs[i];
   const ws = t.ws || 'main';
   const posInWs = wsTabs(ws).findIndex(x => x.id === id);
+  if (id === splitId) splitId = null;   // closing the partner exits split
   if (t.url && t.url !== START){ closed.unshift(t.url); closed = closed.slice(0, 20); save('kb.closed', closed); }
   if (t.wv) t.wv.remove();
   tabs.splice(i, 1);
   if (activeId === id){
+    if (splitId != null){ const s = splitId; splitId = null; activate(s); return; }   // partner takes over the pane
     const rest = wsTabs(ws);
     if (rest.length) activate(rest[Math.min(posInWs, rest.length - 1)].id);
     else newTab(START);   // workspace emptied — reopen a start tab in the same workspace
-  } else { renderTabs(); persistSession(); }
+  } else { renderStageVis(); renderTabs(); persistSession(); }
 }
 
 function reopenClosed(){
@@ -1766,6 +1821,20 @@ $('#bRel').onclick = () => {
 };
 $('#ntb').onclick = () => { newTab(START); };
 $('#wsBtn').onclick = e => { e.stopPropagation(); if ($('#wsPop')) closeWsPop(); else openWsPop(); };
+$('#splitSwap').innerHTML = ic('swap', 13);
+$('#splitSwap').onclick = e => { e.stopPropagation(); splitSwap(); };
+$('#splitX').onclick = e => { e.stopPropagation(); splitId = null; renderStageVis(); renderAll(); };
+$('#splitDiv').addEventListener('mousedown', e => {
+  if (e.target.closest('.split-ctl')) return;
+  e.preventDefault();
+  const stage = $('#stage'), r = stage.getBoundingClientRect(), dv = $('#splitDiv');
+  const ov = document.createElement('div');
+  ov.style.cssText = 'position:absolute;inset:0;z-index:59;cursor:col-resize';
+  stage.appendChild(ov); dv.classList.add('drag');
+  const move = ev => { let pct = ((ev.clientX - r.left) / r.width) * 100; pct = Math.max(22, Math.min(78, pct)); stage.style.setProperty('--split', pct.toFixed(1) + '%'); };
+  const up = () => { document.removeEventListener('mousemove', move); document.removeEventListener('mouseup', up); ov.remove(); dv.classList.remove('drag'); };
+  document.addEventListener('mousemove', move); document.addEventListener('mouseup', up);
+});
 $('#star').onclick = () => toggleBookmark();
 $('#bDl').onclick = () => togglePanel('pDl');
 $('#bMenu').onclick = e => { e.stopPropagation(); toggleMenu(); };
@@ -1829,6 +1898,10 @@ function openTabMenu(x, y, t){
     { l:'Duplicate tab', fn:()=>{ if (t.url && t.url !== START) newTab(t.url); else newTab(START); } },
     { l:'Reload', fn:()=>{ if (t.wv) try { t.wv.reload(); } catch {} } },
     { l:(t.muted?'Unmute tab':'Mute tab'), fn:()=>{ if (t.wv){ t.muted = !t.muted; try { t.wv.setAudioMuted(t.muted); } catch {} renderTabs(); } } },
+    (t.id === activeId
+      ? { l: splitId != null ? 'Exit split view' : 'Split view', fn: toggleSplit }
+      : { l: splitId === t.id ? 'Exit split view' : 'Open in split view',
+          fn: () => { if (splitId === t.id){ splitId = null; renderStageVis(); renderAll(); } else setSplit(t.id); } }),
     'sep',
     ...others.map(w => ({ l:'Move to '+w.name, dot:w.color, fn:()=>moveTabToWs(t.id, w.id) })),
     { l:'Move to new workspace', fn:()=>{ newWorkspace(); moveTabToWs(t.id, wsActiveId()); } },
@@ -2064,6 +2137,7 @@ function toggleMenu(){
     + Math.round(((t && t.zoom) || 1) * 100) + '%</b><button data-m="zin">+</button></div>'
     + '<div class="m-sep"></div>'
     + mrow('find','Find in page','Ctrl+F','find')
+    + mrow('split', splitId != null ? 'Exit split view' : 'Split view','Ctrl+\\','split')
     + mrow('pip','Pop out video','','pip')
     + mrow('print','Print…','Ctrl+P','print')
     + '<div class="m-sep"></div>'
@@ -2096,6 +2170,7 @@ $('#menu').addEventListener('click', e => {
   else if (act === 'zin') zoomStep(1);
   else if (act === 'zout') zoomStep(-1);
   else if (act === 'find') openFind();
+  else if (act === 'split') toggleSplit();
   else if (act === 'pip') pipVideo();
   else if (act === 'print'){ if (t && t.wv && t.ready) try { t.wv.print(); } catch {} }
   else if (act === 'readlater') addReadingList();
@@ -2615,6 +2690,7 @@ function chord(c){
     case 'ctrl+j': togglePanel('pDl'); break;
     case 'ctrl+d': toggleBookmark(); break;
     case 'ctrl+k': openCmdK(); break;
+    case 'ctrl+\\': toggleSplit(); break;
     case 'ctrl+shift+b': toggleBookmarksBar(); break;
     case 'ctrl+p': if (t && t.wv && t.ready) try { t.wv.print(); } catch {} break;
     case 'ctrl+r': case 'f5': if (t && t.wv) try { t.wv.reload(); } catch {} break;
@@ -2659,7 +2735,7 @@ document.addEventListener('keydown', e => {
   if (e.shiftKey && (k === 'tab' || k === 'r' || k === 't' || k === 'b')) c += 'shift+';
   c += k === '+' ? 'plus' : k === 'arrowleft' ? 'left' : k === 'arrowright' ? 'right' : k;
   const CH = new Set(['ctrl+t','ctrl+w','ctrl+shift+t','ctrl+tab','ctrl+shift+tab','ctrl+l','ctrl+f','ctrl+h',
-    'ctrl+j','ctrl+d','ctrl+k','ctrl+shift+b','ctrl+p','ctrl+r','ctrl+shift+r','f5','f6','f11','f12','ctrl+0','ctrl+-','ctrl+=','ctrl+plus',
+    'ctrl+j','ctrl+d','ctrl+k','ctrl+\\','ctrl+shift+b','ctrl+p','ctrl+r','ctrl+shift+r','f5','f6','f11','f12','ctrl+0','ctrl+-','ctrl+=','ctrl+plus',
     'ctrl+1','ctrl+2','ctrl+3','ctrl+4','ctrl+5','ctrl+6','ctrl+7','ctrl+8','ctrl+9','escape']);
   const editing = /INPUT|TEXTAREA/.test(document.activeElement && document.activeElement.tagName || '');
   if (c === 'escape' && editing && document.activeElement !== findQ){ return; }
@@ -3046,6 +3122,15 @@ window.KB = {
     activate(wsTabs('main')[0].id); renderTabs();
     if (open === 'work'){ switchWs('work'); } else { openWsPop(); }
     return { workspaces: wsAll().length, mainTabs: wsTabs('main').length, workTabs: wsTabs('work').length, activeWs: wsActiveId(), pop: !!$('#wsPop') }; },
+  smokeSplit(){ settings.mode = 'dark'; applyTheme(); document.body.classList.remove('bmbar-on'); splitId = null;
+    settings.workspaces = [{id:'main',name:'Main',color:'#a970ff'}]; wsSetActive('main');
+    const a = AT(); tabs.filter(t => t.id !== a.id).forEach(t => { if (t.wv) t.wv.remove(); tabs.splice(tabs.indexOf(t), 1); });
+    a.ws = 'main'; navigate(a, 'https://example.com');
+    const b = newTab('https://en.wikipedia.org/wiki/Web_browser', true); b.ws = 'main';
+    activate(a.id); return { tabs: tabs.length }; },
+  smokeSplitGo(){ const a = AT(); const p = wsTabs().find(t => t.id !== a.id && t.wv); if (p) setSplit(p.id);
+    return { split: $('#stage').classList.contains('split'), on: document.querySelectorAll('webview.wv.on').length,
+             onr: document.querySelectorAll('webview.wv.on-r').length, div: $('#splitDiv').style.display }; },
   smokeSettingsAppearance(){ openSettings(); },
   smokeAccount(){ openAccount(); },
   smokeSettings(){ openSettings(); },

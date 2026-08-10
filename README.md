@@ -93,6 +93,17 @@ The browser now mirrors KONEKT's own appearance settings:
   tab keeps the workspace on a fresh Speed Dial. Membership is restored on
   relaunch and the workspace definitions sync to your account.
 
+### New in 1.7
+
+- **Split view** (desktop) — read two pages at once. **Ctrl+\\**, the menu, or
+  right-click a tab → *Open in split view* puts the active tab and a partner
+  side-by-side in one view, divided by a **draggable divider** (grab it to
+  resize, 22–78%). The divider carries **swap sides** (⇄) and **close** (✕)
+  buttons; activating a tab in the strip slots it into the left pane, and
+  clicking the partner's tab swaps the panes. Closing either tab, or switching
+  workspace, exits the split cleanly. The toolbar and omnibox follow the active
+  (left) pane.
+
 ## Run it
 
 Double-click **`KONEKT Browser.cmd`** — or from a terminal:
