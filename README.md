@@ -82,6 +82,17 @@ The browser now mirrors KONEKT's own appearance settings:
   ads and sidebars are stripped, and the HTML is sanitised before it renders in
   the trusted chrome.
 
+### New in 1.6
+
+- **Workspaces** (desktop) — split your tabs into named, colour-coded groups.
+  A switcher chip in the tab bar shows the active workspace; each workspace
+  shows only its own tabs. Click to switch, **＋ New workspace** to add one, the
+  **⋯** button to rename, recolour (eight-swatch picker) or delete. Right-click
+  any tab → **Move to <workspace>** (or *Move to new workspace*). New tabs join
+  the current workspace; Ctrl+Tab and Ctrl+1…9 stay within it; closing the last
+  tab keeps the workspace on a fresh Speed Dial. Membership is restored on
+  relaunch and the workspace definitions sync to your account.
+
 ## Run it
 
 Double-click **`KONEKT Browser.cmd`** — or from a terminal:

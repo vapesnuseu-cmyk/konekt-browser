@@ -489,6 +489,20 @@ async function runSmoke() {
     out.reader = await win.webContents.executeJavaScript('(function(){var d=document.querySelector(".reader-body");return d?d.innerText.trim().length:0;})()');
     await win.webContents.executeJavaScript('closeReader(),KB.smokeNav("konekt://start"),undefined');
 
+    /* workspaces — three colour-coded tab groups + switcher popover */
+    out.workspaces = await win.webContents.executeJavaScript('KB.smokeWorkspaces()');
+    await delay(500);
+    fs.writeFileSync(path.join(smokeDir, 'smoke-workspaces.png'),
+      (await win.webContents.capturePage()).toPNG());
+    /* switch to Work — the tab strip should now show only Work's tabs */
+    await win.webContents.executeJavaScript('closeWsPop(), switchWs("work"), undefined');
+    await delay(500);
+    out.workStrip = await win.webContents.executeJavaScript('document.querySelectorAll("#tabs .tab").length');
+    fs.writeFileSync(path.join(smokeDir, 'smoke-workspaces2.png'),
+      (await win.webContents.capturePage()).toPNG());
+    /* reset to a single Main workspace + start page */
+    await win.webContents.executeJavaScript('closeWsPop(); settings.workspaces=[{id:"main",name:"Main",color:"#a970ff"}]; wsSetActive("main"); tabs.forEach(t=>t.ws="main"); KB.smokeNav("konekt://start"); renderTabs(); undefined');
+
     /* account modal (sign in / create) */
     await win.webContents.executeJavaScript('kpanelToggle(false), KB.smokeAccount(), undefined');
     await delay(700);

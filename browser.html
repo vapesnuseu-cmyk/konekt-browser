@@ -95,7 +95,46 @@ svg{display:block}
 #ntb{flex:0 0 auto;width:34px;display:flex;align-items:center;justify-content:center;color:var(--dim);
   -webkit-app-region:no-drag}
 #ntb:hover{background:var(--hover);color:var(--text)}
+#wsBtn{flex:0 0 auto;display:flex;align-items:center;gap:6px;height:24px;margin:0 5px 0 3px;padding:0 8px;
+  border-radius:var(--radius);color:var(--text-2);background:var(--hover);-webkit-app-region:no-drag;
+  font-family:var(--font);font-size:11px;font-weight:600;max-width:150px}
+#wsBtn:hover{background:var(--hover-2);color:var(--text)}
+#wsBtn .ws-dot{flex:0 0 auto;width:8px;height:8px;border-radius:50%;background:var(--wsc,#a970ff)}
+#wsBtn .ws-nm{flex:0 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:.2px}
+#wsBtn .ws-cv{flex:0 0 auto;opacity:.55}
 #capPad{flex:1 1 0;-webkit-app-region:drag}
+/* workspace popover */
+.ws-pop{position:fixed;z-index:135;min-width:224px;max-width:288px;background:var(--bg);
+  border:1px solid var(--line);padding:6px;box-shadow:0 12px 40px rgba(0,0,0,.55);
+  border-radius:var(--radius);font-family:var(--font);color:var(--text)}
+[data-appearance="glass"] .ws-pop{background:var(--glass-bg);-webkit-backdrop-filter:blur(var(--glass-blur));backdrop-filter:blur(var(--glass-blur))}
+.wsp-hd{display:flex;align-items:center;gap:3px;padding:5px 8px 8px;font-size:10px;font-weight:700;
+  letter-spacing:.9px;text-transform:uppercase;color:var(--dim)}
+.wsp-row{display:flex;align-items:center;gap:9px;padding:8px;border-radius:var(--radius);cursor:pointer}
+.wsp-row:hover{background:var(--hover)}
+.wsp-row.on{background:var(--hover-2)}
+.wsp-dot{flex:0 0 auto;width:11px;height:11px;border-radius:50%}
+.wsp-nm{flex:1 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:12.5px;font-weight:600}
+.wsp-n{flex:0 0 auto;font-size:11px;color:var(--dim);min-width:15px;text-align:right}
+.wsp-edit{flex:0 0 auto;width:22px;height:22px;display:flex;align-items:center;justify-content:center;
+  color:var(--dim);border-radius:var(--radius);font-size:16px;line-height:1}
+.wsp-edit:hover{background:var(--line-3);color:var(--text)}
+.wsp-new{display:flex;align-items:center;gap:7px;width:100%;padding:9px 8px;margin-top:4px;
+  border-top:1px solid var(--line-3);color:var(--text-2);font-family:var(--font);font-weight:600;font-size:12px}
+.wsp-new:hover{color:var(--text)}
+.wse-back{width:20px;height:20px;display:flex;align-items:center;justify-content:center;font-size:18px;
+  color:var(--dim);border-radius:var(--radius)}
+.wse-back:hover{background:var(--line-3);color:var(--text)}
+.wse-name{width:100%;box-sizing:border-box;height:32px;padding:0 10px;margin:2px 0 10px;
+  background:var(--hover);border:1px solid var(--line-2);border-radius:var(--radius);color:var(--text);
+  font-family:var(--font);font-size:13px;font-weight:600}
+.wse-name:focus{border-color:var(--accent);outline:none}
+.wse-sws{display:flex;flex-wrap:wrap;gap:8px;padding:0 2px 2px}
+.wse-sw{width:26px;height:26px;border-radius:50%;position:relative;-webkit-app-region:no-drag}
+.wse-sw.on::after{content:"";position:absolute;inset:-3px;border:2px solid var(--text);border-radius:50%}
+.wse-del{width:100%;margin-top:11px;padding:9px;border-radius:var(--radius);color:var(--danger);
+  font-family:var(--font);font-weight:600;font-size:12px;border:1px solid var(--line-3)}
+.wse-del:hover{background:rgba(244,33,46,.12)}
 
 /* ---------------- toolbar ---------------- */
 #bar{height:var(--bar);flex:0 0 auto;display:flex;align-items:center;gap:2px;
@@ -371,6 +410,7 @@ body.bmbar-on #bmbar{display:flex}
 .ctx-row{display:block;width:100%;text-align:left;padding:8px 15px;font-size:12.5px;font-weight:600;color:var(--text-2)}
 .ctx-row:hover{background:var(--hover);color:var(--text)}
 .ctx-row.dis{opacity:.38;pointer-events:none}
+.ctx-dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:9px;vertical-align:middle}
 .ctx-sep{height:1px;background:var(--line-3);margin:5px 0}
 
 /* ---------------- reader mode ---------------- */
@@ -679,6 +719,7 @@ body{background-color:var(--bg);background-image:var(--wall,none);background-siz
 
 <div id="cap">
   <div id="capLogo"></div>
+  <button id="wsBtn" title="Workspaces"></button>
   <div id="tabs"></div>
   <button id="ntb" title="New tab (Ctrl+T)"></button>
   <div id="capPad"></div>
@@ -933,10 +974,138 @@ let tabs = [], activeId = null, tabSeq = 0;
 const T = id => tabs.find(t => t.id === id);
 const AT = () => T(activeId);
 
+/* ---------------------- workspaces ---------------------- */
+const WS_COLORS = ['#a970ff','#00ba7c','#1d9bf0','#ff7a00','#f4212e','#ffd400','#e246a8','#8899a6'];
+function wsAll(){
+  let a = settings.workspaces;
+  if (!Array.isArray(a) || !a.length) a = [{ id:'main', name:'Main', color:WS_COLORS[0] }];
+  if (!a.some(w => w.id === 'main')) a = [{ id:'main', name:'Main', color:WS_COLORS[0] }, ...a];
+  return a;
+}
+function wsActiveId(){
+  const a = wsAll(), id = settings.activeWs;
+  return a.some(w => w.id === id) ? id : a[0].id;
+}
+function wsCur(){ const id = wsActiveId(); return wsAll().find(w => w.id === id) || wsAll()[0]; }
+function wsTabs(id){ const w = id || wsActiveId(); return tabs.filter(t => (t.ws || 'main') === w); }
+function wsSetActive(id){ settings.activeWs = id; save('kb.settings', settings); if (window.kbOnSave) kbOnSave('kb.settings'); }
+
+function switchWs(id){
+  if (id === wsActiveId() || !wsAll().some(w => w.id === id)) { closeWsPop(); return; }
+  wsSetActive(id);
+  const inWs = wsTabs(id);
+  if (inWs.length) activate(inWs.some(t => t.id === activeId) ? activeId : inWs[inWs.length - 1].id);
+  else newTab(START);
+  closeWsPop();
+  renderTabs();
+}
+function newWorkspace(){
+  const a = wsAll();
+  const id = 'ws' + (tabSeq + Date.now().toString(36));
+  const color = WS_COLORS[a.length % WS_COLORS.length];
+  settings.workspaces = [...a, { id, name:'Workspace ' + (a.length + 1), color }];
+  wsSetActive(id);
+  newTab(START);
+  closeWsPop();
+  renderTabs();
+}
+function wsUpdate(id, patch){
+  settings.workspaces = wsAll().map(w => w.id === id ? { ...w, ...patch } : w);
+  save('kb.settings', settings); if (window.kbOnSave) kbOnSave('kb.settings');
+  renderTabs();
+}
+function deleteWs(id){
+  if (id === 'main') return;
+  wsTabs(id).slice().forEach(t => { if (t.wv) t.wv.remove(); tabs.splice(tabs.indexOf(t), 1); });
+  settings.workspaces = wsAll().filter(w => w.id !== id);
+  if (wsActiveId() === id) wsSetActive('main');
+  save('kb.settings', settings); if (window.kbOnSave) kbOnSave('kb.settings');
+  if (!wsTabs().length) newTab(START); else activate(wsTabs()[wsTabs().length - 1].id);
+  closeWsPop(); renderTabs();
+}
+
+function moveTabToWs(id, ws){
+  const t = T(id); if (!t || (t.ws || 'main') === ws || !wsAll().some(w => w.id === ws)) return;
+  t.ws = ws;
+  if (t.wv) t.wv.classList.remove('on');
+  if (activeId === id){
+    const rest = wsTabs(wsActiveId());
+    if (rest.length) activate(rest[rest.length - 1].id);
+    else { activeId = null; newTab(START); }
+  } else { renderTabs(); persistSession(); }
+}
+function renderWsChip(){
+  const b = $('#wsBtn'); if (!b) return;
+  const w = wsCur();
+  b.style.setProperty('--wsc', w.color);
+  b.classList.toggle('multi', wsAll().length > 1);
+  b.innerHTML = '<span class="ws-dot"></span><span class="ws-nm">'+esc(w.name)+'</span>'
+    + '<svg class="ws-cv" viewBox="0 0 10 6" width="9" height="6"><path d="M1 1l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+}
+function closeWsPop(){ wsCommitName(); const p = $('#wsPop'); if (p) p.remove(); document.removeEventListener('mousedown', wsPopAway, true); }
+function wsPopAway(e){ if (!e.target.closest('#wsPop') && !e.target.closest('#wsBtn')) closeWsPop(); }
+function wsCommitName(){
+  const pop = $('#wsPop'); if (!pop || !pop.dataset.editing) return;
+  const inp = pop.querySelector('.wse-name'); if (!inp) return;
+  wsUpdate(pop.dataset.editing, { name: (inp.value.trim() || 'Workspace').slice(0, 24) });
+}
+function openWsPop(){
+  const wasOpen = !!$('#wsPop');
+  wsCommitName();
+  const old = $('#wsPop'); if (old) old.remove();
+  const b = $('#wsBtn'); if (!b) return;
+  const cur = wsActiveId();
+  const rows = wsAll().map(w => {
+    const n = wsTabs(w.id).length;
+    return '<div class="wsp-row'+(w.id===cur?' on':'')+'" data-wsp="'+esc(w.id)+'">'
+      + '<span class="wsp-dot" style="background:'+esc(w.color)+'"></span>'
+      + '<span class="wsp-nm">'+esc(w.name)+'</span>'
+      + '<span class="wsp-n">'+n+'</span>'
+      + '<button class="wsp-edit" data-wse="'+esc(w.id)+'" title="Edit">⋯</button></div>';
+  }).join('');
+  const pop = document.createElement('div');
+  pop.id = 'wsPop'; pop.className = 'ws-pop';
+  pop.innerHTML = '<div class="wsp-hd">Workspaces</div>' + rows
+    + '<button class="wsp-new" data-wsnew>'+ic('plus',12)+' New workspace</button>';
+  pop.addEventListener('click', onWsPopClick);
+  document.body.appendChild(pop);
+  const r = b.getBoundingClientRect();
+  pop.style.left = Math.round(r.left) + 'px';
+  pop.style.top  = Math.round(r.bottom + 5) + 'px';
+  const pr = pop.getBoundingClientRect();
+  if (pr.right > innerWidth - 8) pop.style.left = Math.max(8, innerWidth - 8 - pr.width) + 'px';
+  if (!wasOpen) setTimeout(() => document.addEventListener('mousedown', wsPopAway, true), 0);
+}
+function wsEditPop(id){
+  const w = wsAll().find(x => x.id === id); if (!w) return;
+  const pop = $('#wsPop'); if (!pop) return;
+  pop.dataset.editing = id;
+  const sw = WS_COLORS.map(c => '<button class="wse-sw'+(c===w.color?' on':'')+'" data-wsc="'+c+'" style="background:'+c+'"></button>').join('');
+  pop.innerHTML = '<div class="wsp-hd"><button class="wse-back" data-wsback title="Back">‹</button>Edit workspace</div>'
+    + '<input class="wse-name" value="'+esc(w.name)+'" maxlength="24" spellcheck="false" placeholder="Name">'
+    + '<div class="wse-sws">'+sw+'</div>'
+    + (id==='main' ? '' : '<button class="wse-del" data-wsdel="'+esc(id)+'">Delete workspace</button>');
+  const inp = pop.querySelector('.wse-name');
+  if (inp){ inp.focus(); inp.select();
+    inp.addEventListener('keydown', ev => { if (ev.key === 'Enter'){ ev.preventDefault(); wsCommitName(); openWsPop(); } }); }
+}
+function onWsPopClick(e){
+  const pop = $('#wsPop'); if (!pop) return;
+  const edit = e.target.closest('[data-wse]'), row = e.target.closest('[data-wsp]');
+  const nw = e.target.closest('[data-wsnew]'), back = e.target.closest('[data-wsback]');
+  const del = e.target.closest('[data-wsdel]'), sw = e.target.closest('[data-wsc]');
+  if (edit){ e.stopPropagation(); wsEditPop(edit.dataset.wse); }
+  else if (row){ switchWs(row.dataset.wsp); }
+  else if (nw){ newWorkspace(); }
+  else if (back){ const id = pop.dataset.editing; wsCommitName(); delete pop.dataset.editing; openWsPop(); }
+  else if (del){ deleteWs(del.dataset.wsdel); }
+  else if (sw){ const id = pop.dataset.editing; wsCommitName(); wsUpdate(id, { color: sw.dataset.wsc }); wsEditPop(id); }
+}
+
 function newTab(url, background){
   const t = { id:++tabSeq, url:url || START, title:'New tab', fav:null, loading:false,
               canBack:false, canFwd:false, wv:null, ready:false, audible:false, muted:false,
-              err:null, zoom:1 };
+              err:null, zoom:1, ws:wsActiveId() };
   tabs.push(t);
   if (t.url !== START) attach(t, t.url);
   if (!background || !activeId) activate(t.id);
@@ -978,6 +1147,8 @@ function navigate(t, input){
 }
 
 function activate(id){
+  const t0 = T(id);
+  if (t0 && (t0.ws || 'main') !== wsActiveId()) wsSetActive(t0.ws || 'main');
   activeId = id;
   tabs.forEach(t => { if (t.wv) t.wv.classList.toggle('on', t.id === id); });
   renderAll();
@@ -991,12 +1162,16 @@ function closeTab(id){
   const i = tabs.findIndex(t => t.id === id);
   if (i < 0) return;
   const t = tabs[i];
+  const ws = t.ws || 'main';
+  const posInWs = wsTabs(ws).findIndex(x => x.id === id);
   if (t.url && t.url !== START){ closed.unshift(t.url); closed = closed.slice(0, 20); save('kb.closed', closed); }
   if (t.wv) t.wv.remove();
   tabs.splice(i, 1);
-  if (!tabs.length){ newTab(START); return; }
-  if (activeId === id) activate(tabs[Math.min(i, tabs.length - 1)].id);
-  else { renderTabs(); persistSession(); }
+  if (activeId === id){
+    const rest = wsTabs(ws);
+    if (rest.length) activate(rest[Math.min(posInWs, rest.length - 1)].id);
+    else newTab(START);   // workspace emptied — reopen a start tab in the same workspace
+  } else { renderTabs(); persistSession(); }
 }
 
 function reopenClosed(){
@@ -1070,8 +1245,9 @@ function recordHistory(url, title){
 function renderAll(){ renderTabs(); renderNav(); renderOmni(); renderStart(); renderErr(); }
 
 function renderTabs(){
+  renderWsChip();
   const box = $('#tabs');
-  box.innerHTML = tabs.map(t => {
+  box.innerHTML = wsTabs().map(t => {
     const on = t.id === activeId;
     const fav = t.loading
       ? '<span class="tload"></span>'
@@ -1589,6 +1765,7 @@ $('#bRel').onclick = () => {
   try { t.loading ? t.wv.stop() : t.wv.reload(); } catch {}
 };
 $('#ntb').onclick = () => { newTab(START); };
+$('#wsBtn').onclick = e => { e.stopPropagation(); if ($('#wsPop')) closeWsPop(); else openWsPop(); };
 $('#star').onclick = () => toggleBookmark();
 $('#bDl').onclick = () => togglePanel('pDl');
 $('#bMenu').onclick = e => { e.stopPropagation(); toggleMenu(); };
@@ -1644,20 +1821,27 @@ $('#tabs').addEventListener('contextmenu', e => {
 function closeTabMenu(){ const m = $('#tabmenu'); if (m) m.remove(); }
 function openTabMenu(x, y, t){
   closeTabMenu();
-  const idx = tabs.findIndex(tb => tb.id === t.id), last = tabs.length - 1;
+  const list = wsTabs(t.ws || 'main');
+  const idx = list.findIndex(tb => tb.id === t.id), last = list.length - 1;
+  const others = wsAll().filter(w => w.id !== (t.ws || 'main'));
   const rows = [
     { l:'New tab', fn:()=>newTab(START) },
     { l:'Duplicate tab', fn:()=>{ if (t.url && t.url !== START) newTab(t.url); else newTab(START); } },
     { l:'Reload', fn:()=>{ if (t.wv) try { t.wv.reload(); } catch {} } },
     { l:(t.muted?'Unmute tab':'Mute tab'), fn:()=>{ if (t.wv){ t.muted = !t.muted; try { t.wv.setAudioMuted(t.muted); } catch {} renderTabs(); } } },
     'sep',
+    ...others.map(w => ({ l:'Move to '+w.name, dot:w.color, fn:()=>moveTabToWs(t.id, w.id) })),
+    { l:'Move to new workspace', fn:()=>{ newWorkspace(); moveTabToWs(t.id, wsActiveId()); } },
+    'sep',
     { l:'Close tab', fn:()=>closeTab(t.id) },
-    { l:'Close other tabs', dis:tabs.length<2, fn:()=>{ tabs.filter(tb=>tb.id!==t.id).map(tb=>tb.id).forEach(closeTab); } },
-    { l:'Close tabs to the right', dis:idx>=last, fn:()=>{ tabs.slice(idx+1).map(tb=>tb.id).forEach(closeTab); } }
+    { l:'Close other tabs', dis:list.length<2, fn:()=>{ list.filter(tb=>tb.id!==t.id).map(tb=>tb.id).forEach(closeTab); } },
+    { l:'Close tabs to the right', dis:idx>=last, fn:()=>{ list.slice(idx+1).map(tb=>tb.id).forEach(closeTab); } }
   ];
   const m = document.createElement('div'); m.id = 'tabmenu'; m.className = 'ctxmenu';
   m.innerHTML = rows.map((r,i)=> r==='sep' ? '<div class="ctx-sep"></div>'
-    : '<button class="ctx-row'+(r.dis?' dis':'')+'" data-ci="'+i+'">'+esc(r.l)+'</button>').join('');
+    : '<button class="ctx-row'+(r.dis?' dis':'')+'" data-ci="'+i+'">'
+      + (r.dot ? '<span class="ctx-dot" style="background:'+esc(r.dot)+'"></span>' : '')
+      + esc(r.l)+'</button>').join('');
   document.body.appendChild(m);
   m.style.left = Math.min(x, window.innerWidth - m.offsetWidth - 6) + 'px';
   m.style.top = Math.min(y, window.innerHeight - m.offsetHeight - 6) + 'px';
@@ -2443,7 +2627,8 @@ function chord(c){
     case 'alt+left': if (t && t.wv) try { t.wv.goBack(); } catch {} break;
     case 'alt+right': if (t && t.wv) try { t.wv.goForward(); } catch {} break;
     case 'escape':
-      if ($('#reader')) closeReader();
+      if ($('#wsPop')) closeWsPop();
+      else if ($('#reader')) closeReader();
       else if ($('#cmdk')) $('#cmdk').remove();
       else if ($('#findbar').classList.contains('open')) closeFind();
       else if ($('#drawer').classList.contains('open')) closeDrawer();
@@ -2454,16 +2639,17 @@ function chord(c){
       break;
     default:
       if (/^ctrl\+[1-9]$/.test(c)){
-        const n = +c.slice(5);
-        const target = n === 9 ? tabs[tabs.length - 1] : tabs[n - 1];
+        const n = +c.slice(5), list = wsTabs();
+        const target = n === 9 ? list[list.length - 1] : list[n - 1];
         if (target) activate(target.id);
       }
   }
 }
 function cycle(d){
-  if (tabs.length < 2) return;
-  const i = tabs.findIndex(t => t.id === activeId);
-  activate(tabs[(i + d + tabs.length) % tabs.length].id);
+  const list = wsTabs();
+  if (list.length < 2) return;
+  const i = list.findIndex(t => t.id === activeId);
+  activate(list[(i + d + list.length) % list.length].id);
 }
 document.addEventListener('keydown', e => {
   const k = e.key.toLowerCase();
@@ -2540,7 +2726,7 @@ let sessT = null;
 function persistSession(){
   clearTimeout(sessT);
   sessT = setTimeout(() => {
-    save('kb.session', { urls: tabs.map(t => t.url), active: tabs.findIndex(t => t.id === activeId) });
+    save('kb.session', { tabs: tabs.map(t => ({ url: t.url, ws: t.ws || 'main' })), active: tabs.findIndex(t => t.id === activeId), activeWs: wsActiveId() });
   }, 250);
 }
 
@@ -2827,9 +3013,12 @@ renderShield();
 if (settings.kpanel) kpanelToggle(true);
 
 const sess = load('kb.session', null);
-if (settings.restore && sess && Array.isArray(sess.urls) && sess.urls.length){
-  sess.urls.forEach((u, i) => newTab(u || START, i !== (sess.active >= 0 ? sess.active : 0)));
-  const act = tabs[sess.active >= 0 && sess.active < tabs.length ? sess.active : 0];
+const sessList = sess && (Array.isArray(sess.tabs) ? sess.tabs
+                 : Array.isArray(sess.urls) ? sess.urls.map(u => ({ url:u, ws:'main' })) : null);
+if (settings.restore && sessList && sessList.length){
+  if (sess.activeWs) settings.activeWs = sess.activeWs;
+  sessList.forEach(it => { const t = newTab((it && it.url) || START, true); t.ws = (it && it.ws) || 'main'; });
+  const act = tabs[sess.active >= 0 && sess.active < tabs.length ? sess.active : 0] || tabs[0];
   if (act) activate(act.id);
 } else {
   newTab(START);
@@ -2849,6 +3038,14 @@ window.KB = {
   smokeCmdK(){ settings.mode = 'dark'; applyTheme(); hudEdit = false; settings.bmbar = true; document.body.classList.add('bmbar-on');
     bookmarks = [{u:'https://konekt.network',t:'KONEKT'},{u:'https://github.com',t:'GitHub'},{u:'https://news.ycombinator.com',t:'Hacker News'}]; renderBmBar();
     openCmdK(); const i = $('#cmdkIn'); if (i){ i.value = 'kon'; i.dispatchEvent(new Event('input')); } },
+  smokeWorkspaces(open){ settings.mode = 'dark'; applyTheme(); document.body.classList.remove('bmbar-on');
+    settings.workspaces = [{id:'main',name:'Main',color:'#a970ff'},{id:'work',name:'Work',color:'#00ba7c'},{id:'play',name:'Play',color:'#1d9bf0'}];
+    wsSetActive('main'); tabs.forEach(t => { t.ws = 'main'; if (t.url === START) t.title = 'Speed Dial'; });
+    const mk = (ws, ti) => { const t = newTab(START, true); t.ws = ws; t.title = ti; return t; };
+    mk('work', 'Wikipedia'); mk('work', 'Hacker News'); mk('play', 'GitHub');
+    activate(wsTabs('main')[0].id); renderTabs();
+    if (open === 'work'){ switchWs('work'); } else { openWsPop(); }
+    return { workspaces: wsAll().length, mainTabs: wsTabs('main').length, workTabs: wsTabs('work').length, activeWs: wsActiveId(), pop: !!$('#wsPop') }; },
   smokeSettingsAppearance(){ openSettings(); },
   smokeAccount(){ openAccount(); },
   smokeSettings(){ openSettings(); },
