@@ -20,6 +20,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
+import android.content.res.Configuration;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
@@ -115,8 +116,9 @@ public class BrowserActivity extends Activity {
   final List<Tab> tabs = new ArrayList<>();
   int cur = -1;
 
-  FrameLayout root, container, fsHolder;
+  FrameLayout root, container, fsHolder, bottomHost;
   LinearLayout bottomWrap, addrRow, navRow, sheet;
+  boolean lastNight;              // last known system dark/light, for fold/theme config changes
   EditText addr;
   Icon lockIc, reloadIc, backB, fwdB, tabsB, acctB, menuB;
   View progress, addrRowLine, navRowLine;
@@ -218,7 +220,13 @@ public class BrowserActivity extends Activity {
     navRow.addView(backB); navRow.addView(fwdB); navRow.addView(tabsB); navRow.addView(acctB); navRow.addView(menuB);
     bottomWrap.addView(navRow, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(52)));
 
-    col.addView(bottomWrap, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+    /* host spans edge-to-edge (bar colour); the controls centre within a max
+       width so on a Galaxy Fold's wide inner screen they stay thumb-reachable */
+    bottomHost = new FrameLayout(this);
+    bottomHost.setBackgroundColor(BAR);
+    bottomHost.addView(bottomWrap, new FrameLayout.LayoutParams(
+        ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.CENTER_HORIZONTAL | Gravity.BOTTOM));
+    col.addView(bottomHost, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
     root.addView(col, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 
     fsHolder = new FrameLayout(this);
@@ -229,6 +237,8 @@ public class BrowserActivity extends Activity {
     setContentView(root);
     defaultUA = WebSettings.getDefaultUserAgent(this);
     applyAppearance();
+    lastNight = sysNight();
+    applyResponsive();
 
     String intentUrl = urlFromIntent(getIntent());
     restoreSession();
@@ -253,6 +263,45 @@ public class BrowserActivity extends Activity {
     return null;
   }
   @Override protected void onNewIntent(Intent i) { super.onNewIntent(i); String u = urlFromIntent(i); if (u != null) newTab(u, false); }
+
+  /* ================================================================ foldable / responsive
+     Galaxy Fold has two very different screens — a narrow tall COVER screen and a large
+     near-square INNER screen — and folds between them live. The manifest keeps the
+     Activity alive across the fold (configChanges), so we re-flow here instead of
+     restarting. On a wide screen the bottom chrome and the sheets centre within a max
+     width, so the address bar and the five nav icons stay thumb-reachable near the middle
+     rather than stretching the full span. The web content itself always stays full-bleed. */
+  boolean wide() { return getResources().getConfiguration().screenWidthDp >= 600; }
+  int chromeWidth() { return wide() ? dp(560) : ViewGroup.LayoutParams.MATCH_PARENT; }
+
+  void applyResponsive() {
+    if (bottomWrap == null) return;
+    ViewGroup.LayoutParams p = bottomWrap.getLayoutParams();
+    if (p instanceof FrameLayout.LayoutParams) {
+      FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) p;
+      lp.width = chromeWidth();
+      lp.gravity = Gravity.CENTER_HORIZONTAL | Gravity.BOTTOM;
+      bottomWrap.setLayoutParams(lp);
+    }
+  }
+  void applySheetWidth(View s) {
+    if (s == null) return;
+    ViewGroup.LayoutParams p = s.getLayoutParams();
+    if (p instanceof FrameLayout.LayoutParams) {
+      FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) p;
+      lp.width = chromeWidth();
+      lp.gravity = Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL;
+      s.setLayoutParams(lp);
+    }
+  }
+
+  @Override public void onConfigurationChanged(Configuration cfg) {
+    super.onConfigurationChanged(cfg);
+    applyResponsive();
+    applySheetWidth(sheet);
+    boolean night = sysNight();
+    if (night != lastNight) { lastNight = night; if (mode().equals("system")) applyAppearance(); }
+  }
 
   /* ================================================================ appearance */
   int parseColor(String s, int def) { try { return Color.parseColor(s); } catch (Exception e) { return def; } }
@@ -645,7 +694,7 @@ public class BrowserActivity extends Activity {
     View top = new View(this); top.setBackgroundColor(LINE);
     sheet.addView(top, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(1)));
     sheet.addView(head);
-    FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM);
+    FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(chromeWidth(), ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
     root.addView(sheet, lp);
     return sheet;
   }

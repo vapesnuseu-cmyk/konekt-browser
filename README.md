@@ -104,6 +104,20 @@ The browser now mirrors KONEKT's own appearance settings:
   workspace, exits the split cleanly. The toolbar and omnibox follow the active
   (left) pane.
 
+### New in 1.8
+
+- **Foldable / Galaxy Fold support** (Android) — the app now adapts to the two
+  very different screens of a foldable and re-flows **live as you fold**, without
+  a restart (the Activity survives the configuration change). On the narrow
+  **cover** screen the chrome stays thumb-first and the Speed Dial is a tight
+  three-column grid; on the wide near-square **inner** screen the bottom chrome
+  and the five-icon nav **centre within a reachable max width** instead of
+  stretching edge-to-edge, bottom sheets centre too, and the Speed Dial grows to
+  **four or five columns** with more top-site tiles. The web page itself always
+  stays full-bleed. A `screenWidthDp ≥ 600` breakpoint drives the native side and
+  matching CSS breakpoints drive the Speed Dial page (the Windows desktop build is
+  version-synced with no desktop-facing changes).
+
 ## Run it
 
 Double-click **`KONEKT Browser.cmd`** — or from a terminal:
